@@ -1,3 +1,4 @@
+#+TITLE: Some notes and solutions to Tom Mitchell's \emph{Machine Learning} (McGraw Hill, 1997)
 * DONE 1.1
   CLOSED: [2011-10-12 Wed 04:21]
   Appropriate:
@@ -40,15 +41,11 @@
        tonic) = 100, V(b = final non-tonic) = -100.
   - target function representation :: $\hat{V}(b) = w_0 +$, where x_1
        = length of prompt - number of chords in answer
-* TODO 1.3
-  From page 11: "The LMS training rule can be viewed as performing a
-  stochastic gradient-descent search through the space of possible
-  hypotheses (weight values) to minimize the squared error $E$."
-
+* DONE 1.3
+  CLOSED: [2011-10-12 Wed 12:46]
   Here's a solution for the trivial case in which $\left|\left<b,
   V_\text{train}(b)\right>\right| = 1$ and the target function
-  $\hat{V}$ consists of a single feature $x$ and a single weight $w$.
-
+  $\hat{V}$ consists of a single feature $x$ and a single weight $w$:
   #+BEGIN_LaTeX
     \begin{align}
       \frac{\partial E}{\partial w}
@@ -59,9 +56,7 @@
       &= -2({V_\text{train}(b) - \hat{V}(b)})x \label{error-derivative}
     \end{align}    
   #+END_LaTeX
-
   which gives:
-
   #+BEGIN_LaTeX
     \begin{align}
       w_{n+1} &= w_n - \frac{\partial E}{\partial w} \\
@@ -73,7 +68,11 @@
   It should be trivial to extend this to the case where $\mathbf{w}$
   and $\mathbf{X}$ are vectors; the LMS training rule, furthermore,
   covers the summation.
-** [[http://en.wikipedia.org/wiki/Gradient_descent][Gradient descent]]
+** [[http://en.wikipedia.org/wiki/Gradient_descent][Gradient descent]]   
+   From page 11: "The LMS training rule can be viewed as performing a
+   stochastic gradient-descent search through the space of possible
+   hypotheses (weight values) to minimize the squared error $E$."
+
    - Gradient descent is a first-order optimization algorithm. To find
      a local minimum of a function . . . one takes steps proportional
      to the negative of the gradient of the function at the current
