@@ -159,7 +159,7 @@
    of which the operational approximation is $\hat{V}(b)$.
 
    Whereas for checkers:
-     #+BEGIN_QUOTE   
+     #+BEGIN_QUOTE
      - $x_1$ :: black pieces
      - $x_2$ :: red pieces
      - $x_3$ :: black kings
@@ -167,33 +167,32 @@
      - $x_5$ :: black pieces threatened
      - $x_6$ :: red pieces threatened
      #+END_QUOTE
-   for tic-tac-toe, maybe we can use the following features as a starting hypothesis:
+   For tic-tac-toe, maybe we can use the following features as a starting hypothesis:
      #+BEGIN_QUOTE
      - $x_1$ :: number of Xs
      - $x_2$ :: number of Os
      - $x_3$ :: number of potential 3s for X
      - $x_4$ :: number of potential 3s for O
      #+END_QUOTE
-   which covers forks, doesn't it? Or should we explicitly enumerate
-   it?
+   It covers forks, doesn't it? Or should we explicitly enumerate it?
 
    Maybe, on the other hand, number of Xs and Os doesn't matter; since
    they increase perforce. A full enumeration of features will
    probably slow down analysis, won't it? Maybe that's the tradeoff:
    speed for precision.
      #+BEGIN_QUOTE
-     - $x_3$ :: X 3-in-a-row?
-     - $x_4$ :: O 3-in-a-row?
-     - $x_5$ :: X fork?
-     - $x_6$ :: O fork?
-     - $x_$ :: X center?
-     - $x_$ :: O center?
-     - $x_$ :: X opposite corner?
-     - $x_$ :: O opposite corner?
-     - $x_$ :: X empty corner?
-     - $x_$ :: O empty corner?
-     - $x_$ :: X empty side?
-     - $x_$ :: O empty side?
+     - $x_1$ :: X 3-in-a-row?
+     - $x_2$ :: O 3-in-a-row?
+     - $x_3$ :: X fork?
+     - $x_4$ :: O fork?
+     - $x_5$ :: X center?
+     - $x_6$ :: O center?
+     - $x_7$ :: X opposite corner?
+     - $x_8$ :: O opposite corner?
+     - $x_9$ :: X empty corner?
+     - $x_10$ :: O empty corner?
+     - $x_11$ :: X empty side?
+     - $x_12$ :: O empty side?
      #+END_QUOTE
    Page 8: "In general, this choice of representation involves a
    crucial tradeoff. On one hand, we wish to pick a very expressive
@@ -202,6 +201,87 @@
    more expressive the representation, tho more training data the
    program will require in order to choose among the alternative
    hypotheses it can represent."
+
+   Here's a crazy thought: since the space-state complexity of
+   tic-tac-toe is utterly tractable, let's have nine features: one
+   corresponding to each of the squares.
+
+   How do we deal with training the opposite direction, by the way:
+   invert the outcome of the training data?
+
+   I have no idea how much training data nine variables need: we'll
+   have to plot it; interesting to compare a strategy containing
+   e.g. forks and wins.
+
+   Is it interesting that each variable is binary?
+
+   Let's start with the generalizer and a catalog of games; in order
+   to map the number of training-examples . . . Ah, I see: the second
+   player has a fixed evaluation function. Can we abstract [[http://xkcd.com/832_large/][xkcd]]?
+   Problem is, the space for O is much more complicated. Maybe we can
+   abstract the [[http://en.wikipedia.org/wiki/Tic-tac-toe][Wikipedia strategy]]:
+# <<wikipedia-strategy>>
+     1. Win
+     2. Block
+     3. Fork
+     4. Block a fork
+     5. Center
+     6. Opposite corner
+     7. Empty side
+   (It looks like the Wikipedia strategy was abstracted from [[http://www.buzzle.com/articles/tic-tac-toe-strategy-guide.html][here]], by
+   the way; damn: it looks like there are separate X- and
+   O-heuristics.)
+
+   Represent the board as a vector of nine values; can we set up
+   abstractions for $<x, y>$ as well as
+   ={map,reduce,for-each}-{row,column,diagonal,triplet}=?
+
+   Meh; maybe we can implement the [[wikipedia-strategy][X/O-agnostic heuristics]].
+
+   #+BEGIN_SRC scheme :tangle tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
+     (use debug srfi-1)
+     
+     (define (make-board)
+       (make-vector 9 #f))
+     
+     (define rows
+       '((0 1 2)
+         (3 4 5)
+         (6 7 8)))
+     
+     (define columns
+       '((0 3 6)
+         (1 4 7)
+         (2 5 8)))
+     
+     (define diagonals
+       '((0 4 8)
+         (2 4 6)))
+     
+     (define triplets
+       (append rows columns diagonals))
+     
+     (define (triplet->index-value board triplet)
+       (map (lambda (i) (cons i (vector-ref board i))) triplet))
+     
+     (define (for-each-triplet procedure board)
+       (for-each (lambda (triplet)
+                   (procedure (triplet->index-value board triplet)))
+                 triplets))
+     
+     (define (fold-triplet cons nil board)
+       (fold (lambda (triplet accumulatum)
+               #;(debug triplet accumulatum)
+               (cons (triplet->index-value board triplet)
+                     accumulatum))
+             nil
+             triplets))
+     
+     (let ((board (make-board)))
+       (debug (for-each-triplet display board)
+              (fold-triplet cons '() board)))
+     
+   #+END_SRC
 * Notes
 ** 1 
    - a computer program is said to learn from experienc E with respect
