@@ -96,7 +96,8 @@
       equations, reformulated as a quadratic minimization problem,
       e.g., using linear least squares.
     - Convergence can be made faster by using an adaptive step size.
-* TODO 1.4
+* DONE 1.4
+  CLOSED: [2011-10-12 Wed 18:21]
   ``Generating random legal board positions'' is an interesting
   sampling strategy that might expose the performance system to
   improbable positions that form the "long tail" of possible board
@@ -105,8 +106,21 @@
 
   ``Generating a position by picking a previous game and applying one
   of the moves not executed'' is a good exhaustive search strategy
-  which may be
+  which may or may not be feasible, depending on the [[http://en.wikipedia.org/wiki/Game_complexity#Measures_of_game_complexity][state-space
+  complexity]] of the game.
 
+  One mechanism might be to generate positions from expert endgames in
+  reverse: you're starting with a pruned search space such that, by
+  the time you're generating from openings, you might already have a
+  reasonably good hypothesis. If e.g. world championship games share
+  characteristics with expert games, this may be a reasonable
+  heuristic for competitions. On the other hand, the hypothesis would
+  be vulnerable to paradigmatic shifts in expert play.
+
+  If an exhaustive search of the state-space in infeasible and
+  training examples were held constant, I'd bet on reverse-search of
+  an expert-corpus over random sampling; especially if, /vide supra/,
+  championship and expert play share certain characteristics.
 ** Notes
   #+BEGIN_LATEX
     \begin{figure}[H]
