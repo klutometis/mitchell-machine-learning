@@ -140,6 +140,68 @@
        game. More sophisticated strategies could involve creating
        board positions designed to explore particular regions of the
        state space.
+* TODO 1.5
+  
+  
+** Notes
+   ``Non-operational'' definition of $V(b)$:
+     #+BEGIN_LATEX
+       \begin{equation}
+         V(b) =
+         \begin{cases}
+           100 & \text{$b$ is a final winning board state} \\
+           -100 & \text{$b$ is a final losing board state} \\
+           0 & \text{$b$ is a final drawing board state} \\
+           V(b^\prime) & \text{otherwise, where $b^\prime$ is an optimal final board state}
+         \end{cases}     
+       \end{equation}
+     #+END_LATEX
+   of which the operational approximation is $\hat{V}(b)$.
+
+   Whereas for checkers:
+     #+BEGIN_QUOTE   
+     - $x_1$ :: black pieces
+     - $x_2$ :: red pieces
+     - $x_3$ :: black kings
+     - $x_4$ :: red kings
+     - $x_5$ :: black pieces threatened
+     - $x_6$ :: red pieces threatened
+     #+END_QUOTE
+   for tic-tac-toe, maybe we can use the following features as a starting hypothesis:
+     #+BEGIN_QUOTE
+     - $x_1$ :: number of Xs
+     - $x_2$ :: number of Os
+     - $x_3$ :: number of potential 3s for X
+     - $x_4$ :: number of potential 3s for O
+     #+END_QUOTE
+   which covers forks, doesn't it? Or should we explicitly enumerate
+   it?
+
+   Maybe, on the other hand, number of Xs and Os doesn't matter; since
+   they increase perforce. A full enumeration of features will
+   probably slow down analysis, won't it? Maybe that's the tradeoff:
+   speed for precision.
+     #+BEGIN_QUOTE
+     - $x_3$ :: X 3-in-a-row?
+     - $x_4$ :: O 3-in-a-row?
+     - $x_5$ :: X fork?
+     - $x_6$ :: O fork?
+     - $x_$ :: X center?
+     - $x_$ :: O center?
+     - $x_$ :: X opposite corner?
+     - $x_$ :: O opposite corner?
+     - $x_$ :: X empty corner?
+     - $x_$ :: O empty corner?
+     - $x_$ :: X empty side?
+     - $x_$ :: O empty side?
+     #+END_QUOTE
+   Page 8: "In general, this choice of representation involves a
+   crucial tradeoff. On one hand, we wish to pick a very expressive
+   representation to allow representing as close an approximation as
+   possible to the ideal target function $V$. On the other hand, the
+   more expressive the representation, tho more training data the
+   program will require in order to choose among the alternative
+   hypotheses it can represent."
 * Notes
 ** 1 
    - a computer program is said to learn from experienc E with respect
