@@ -1,23 +1,23 @@
 #+TITLE: Some notes and solutions to Tom Mitchell's \emph{Machine Learning} (McGraw Hill, 1997)
 * DONE 1.1
   CLOSED: [2011-10-12 Wed 04:21]
-  Appropriate:
-  - animal languages :: could craft appropriate responses
-       and prompts, perhaps, though ignorant of the semantics.
-  - fugues :: train on bach data, or buxtehude. performance measure?
-              perfect authentic cadence, of course. ;) no, not that
-              simple.
-  - narratives :: learn the structure of narratives? performance
-                  measure is tricky here.
-  Not appropriate:
-  - comedy :: requires a bizarre ex nihilo and sponteneity
-              (distinguishable from three above?) in fact, the
-              second and third above are inappropriate, rather?
-              define "inappropriate": difficult? vague performance
-              measure?
-  - data representation and search :: or have meta-learning-problems
-       been solved?
-  - new science and mathematics :: can "creativity" be modelled?
+  - Appropriate ::    
+    - animal languages :: could craft appropriate responses
+         and prompts, perhaps, though ignorant of the semantics.
+    - fugues :: train on bach data, or buxtehude. performance measure?
+                perfect authentic cadence, of course. ;) no, not that
+                simple.
+    - narratives :: learn the structure of narratives? performance
+                    measure is tricky here.
+  - Not appropriate ::
+    - comedy :: requires a bizarre ex nihilo and sponteneity
+                (distinguishable from three above?) in fact, the
+                second and third above are inappropriate, rather?
+                define "inappropriate": difficult? vague performance
+                measure?
+    - data representation and search :: or have meta-learning-problems
+         been solved?
+    - new science and mathematics :: can "creativity" be modelled?
 
   So we can't, indeed, escape the question of modelling; once the
   mechanics of learning have been mastered, there lies the ex
@@ -70,32 +70,62 @@
   It should be trivial to extend this to the case where $\mathbf{w}$
   and $\mathbf{X}$ are vectors; the LMS training rule, furthermore,
   covers the summation.
-** [[http://en.wikipedia.org/wiki/Gradient_descent][Gradient descent]]   
+** Notes
    From page 11: "The LMS training rule can be viewed as performing a
    stochastic gradient-descent search through the space of possible
    hypotheses (weight values) to minimize the squared error $E$."
+*** [[http://en.wikipedia.org/wiki/Gradient_descent][Gradient descent]]
+    - Gradient descent is a first-order optimization algorithm. To find
+      a local minimum of a function . . . one takes steps proportional
+      to the negative of the gradient of the function at the current
+      point.
+      - If one takes steps proportional to the positive of the
+        gradient, one approaches a local maximum: gradient ascent.
+    - Known as steepest descent.
+    - If $F(x)$ is defined and differentiable in a neighborhood of
+      point $a$, $F(x)$ decreases fastest if one goes from $a$ in the
+      direction of the negative gradient of $F$ at $a$,
+      $-\bigtriangledown F(a)$.
+    - If $b = a - \gamma\bigtriangledown F(a)$ for $\gamma > 0$, then
+      $F(a) \geq F(b)$.
+    - One starts with a guess $x_0$ for a local minimum of $F$, and
+      considers the sequence $x_0, x_1, \dots$ such that $x_{n+1} =
+      x_n - \gamma_n\bigtriangledown F(x_n), n \geq 0$.
+    - We have $F(x_0) \geq F(x_1) \geq \cdots$.
+    - Gradient descent can be used to solve a system of linear
+      equations, reformulated as a quadratic minimization problem,
+      e.g., using linear least squares.
+    - Convergence can be made faster by using an adaptive step size.
+* TODO 1.4
+  ``Generating random legal board positions'' is an interesting
+  sampling strategy that might expose the performance system to
+  improbable positions that form the "long tail" of possible board
+  positions; the resultant hypothesis might not be optimized for
+  common positions, though.
 
-   - Gradient descent is a first-order optimization algorithm. To find
-     a local minimum of a function . . . one takes steps proportional
-     to the negative of the gradient of the function at the current
-     point.
-     - If one takes steps proportional to the positive of the
-       gradient, one approaches a local maximum: gradient ascent.
-   - Known as steepest descent.
-   - If $F(x)$ is defined and differentiable in a neighborhood of
-     point $a$, $F(x)$ decreases fastest if one goes from $a$ in the
-     direction of the negative gradient of $F$ at $a$,
-     $-\bigtriangledown F(a)$.
-   - If $b = a - \gamma\bigtriangledown F(a)$ for $\gamma > 0$, then
-     $F(a) \geq F(b)$.
-   - One starts with a guess $x_0$ for a local minimum of $F$, and
-     considers the sequence $x_0, x_1, \dots$ such that $x_{n+1} =
-     x_n - \gamma_n\bigtriangledown F(x_n), n \geq 0$.
-   - We have $F(x_0) \geq F(x_1) \geq \cdots$.
-   - Gradient descent can be used to solve a system of linear
-     equations, reformulated as a quadratic minimization problem,
-     e.g., using linear least squares.
-   - Convergence can be made faster by using an adaptive step size.
+  ``Generating a position by picking a previous game and applying one
+  of the moves not executed'' is a good exhaustive search strategy
+  which may be
+
+** Notes
+  #+BEGIN_LATEX
+    \begin{figure}[H]
+      \begin{align*}
+        \text{Training} & \xrightarrow{\text{Games against self}} V \\
+        & \xrightarrow{\text{Board} \to \text{value}} \text{Representation} \\
+        & \xrightarrow{\text{Linear function}} \text{Algorithm} \\
+        & \xrightarrow{\text{Gradient descent}} \text{Design}
+      \end{align*}
+      \caption{Summary of design}
+    \end{figure}    
+  #+END_LATEX
+
+  - Experiment generator :: Take as input the current hypothesis and
+       output a new problem for the performance system to explore. Our
+       experiment generator always proposes the same initial board
+       game. More sophisticated strategies could involve creating
+       board positions designed to explore particular regions of the
+       state space.
 * Notes
 ** 1 
    - a computer program is said to learn from experienc E with respect
