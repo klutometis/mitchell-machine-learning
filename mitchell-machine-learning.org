@@ -569,8 +569,9 @@
       (use debug
            vector-lib
            srfi-1
-           test
-           srfi-26)
+           srfi-11
+           srfi-26
+           test)
       
       (define n (make-parameter 3))
       
@@ -607,7 +608,7 @@
         (list (ac-diagonal)
               (bd-diagonal)))
       
-      (define (triplets)
+      (define (tuplets)
         (append (rows)
                 (columns)
                 (diagonals)))
@@ -694,11 +695,11 @@
                                (if (even? moves) X O))
                   (iter (- moves 1) (cdr indices)))))))
       
-      (define (fold-triplet cons nil board)
-        (fold (lambda (triplet accumulatum)
-                (cons triplet accumulatum))
+      (define (fold-tuplet cons nil board)
+        (fold (lambda (tuplet accumulatum)
+                (cons tuplet accumulatum))
               nil
-              (triplets)))
+              (tuplets)))
       
       (define (empty-spaces board)
         (vector-fold (lambda (space empty-spaces mark)
@@ -708,23 +709,23 @@
                      '()
                      board))
       
-      ;;; Putting triplet first would allow you to use many boards.
-      (define (first-empty-space board triplet)
-        (find (cute empty? board <>) triplet))
+      ;;; Putting tuplet first would allow you to use many boards.
+      (define (first-empty-space board tuplet)
+        (find (cute empty? board <>) tuplet))
       
-      (define (winning-triplet? player? triplet board)
+      (define (winning-tuplet? player? tuplet board)
         (let ((non-player-marks
-               (filter (cute (complement player?) board <>) triplet)))
+               (filter (cute (complement player?) board <>) tuplet)))
           (equal? (map (cute board-ref board <>) non-player-marks)
                   `(,ε))))
       
       ;;; The solutions here may be non-unique: in which case, we have a
       ;;; convergent fork.
       (define (winning-spaces player? board)
-        (fold-triplet
-         (lambda (triplet winning-spaces)
-           (if (winning-triplet? player? triplet board)
-               (cons (first-empty-space board triplet) winning-spaces)
+        (fold-tuplet
+         (lambda (tuplet winning-spaces)
+           (if (winning-tuplet? player? tuplet board)
+               (cons (first-empty-space board tuplet) winning-spaces)
                winning-spaces))
          '()
          board))
@@ -753,6 +754,12 @@
           (filter (lambda (opposite-corner)
                     (empty? board opposite-corner))
                   opposite-corners)))
+      
+      (define (random-ref list)
+        (list-ref list (random (length list))))
+      
+      (define (random-empty-space board)
+        (random-ref (empty-spaces board)))
       
       (let ((board (board X X ε
                           O O X
@@ -794,6 +801,86 @@
         (test "opposite-corners"
               '(8 2)
               (opposite-corners X? board)))
+      
+      (let ((board (make-empty-board)))
+        (test-assert "random-empty-space"
+                     (< (random-empty-space board) (n-by-n))))
+      
+      (define (win? player? board)
+        (fold-tuplet
+         (lambda (tuplet win?)
+           (or (every player?
+                      (map (cute board-ref board <>) tuplet))
+               win?))
+         #f
+         board))
+      
+      (define (X-win? outcome) (X? outcome))
+      (define (O-win? outcome) (O? outcome))
+      (define (draw? outcome) (empty? outcome))
+      
+      (define (outcome board)
+        (cond ((win? X? board) X)
+              ((win? O? board) O)
+              ((null? (empty-spaces board)) ε)
+              (else #f)))
+      
+      (let* ((board (board X ε ε
+                           X O O
+                           X ε ε))
+             (outcome (outcome board)))
+        (test-assert "Win for X"
+                     (X-win? outcome))
+        (test-assert "No win for O"
+                     (not (O-win? outcome))))
+      
+      (let ((board (board O X O
+                          X O O
+                          X O X)))
+        (test-assert "Draw outcome"
+                     (draw? (outcome board))))
+      
+      (let ((board (board O X O
+                          X O O
+                          X O ε)))
+        (test-assert "No outcome yet"
+                     (not (outcome board))))
+      
+      (define (make-random-player player player?)
+        (lambda (board)
+          (random-empty-space board)))
+      
+      ;;; This shit probably has to go.
+      (define make-default-player
+        (make-parameter make-random-player))
+      
+      (define play
+        (case-lambda
+         (()
+          (play (make-empty-board)))
+         ((board)
+          (play ((make-default-player) X X?)
+                ((make-default-player) O O?)
+                board))
+         ((X-player O-player board)
+          (play 0 X-player O-player board))
+         ((move X-player O-player board)
+          (debug move)
+          (display-board board)
+          (or (outcome board)
+              (let-values (((token player)
+                            (if (even? move)
+                                (values X X-player)
+                                (values O O-player))))
+                (let ((next-move (player board)))
+                  (board-set! board next-move token)
+                  (play (+ move 1)
+                        X-player
+                        O-player
+                        board)))))))
+      
+      (debug (play))
+      
     #+END_SRC
 
     Instead of this heuristics-based approach, we could map out the
@@ -812,3 +899,19 @@
     W.r.t. the heuristic player, by the way, can't we get rid of
     =space-marks= and rely on =board-ref= instead? Triplets (tuplets)
     are just lists of indices, then. Good call.
+
+    We should have two graphs, by the way: training games vs. games
+    one against 1) the heuristic and 2) the deterministic player.
+
+    The heuristic player has the interesting property that it can
+    continue from illegal positions; the deterministic player would be
+    confined to legal positions, wouldn't it?
+
+    Should we create directories for modules? Should the players be
+    stateful or stateless? If the e.g. deterministic player is
+    stateless, we should probably analyse the game off-line. We can
+    instantiate the player with a token and predicate (i.e. X and X?
+    or O and O?); the player receives a game state and returns a
+    space. Some kind of intermediary updates the game space and, in
+    theory, arbitrates for legality, etc. Initially, though, we can
+    trust the agents.
