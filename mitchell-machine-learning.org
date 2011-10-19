@@ -624,12 +624,6 @@
       
       (define O 1)
       
-      (define space car)
-      
-      (define mark cdr)
-      
-      ;;; Should we have corresponding predicates which take a board and
-      ;;; space?
       (define X?
         (case-lambda
          ((mark) (= X mark))
@@ -700,23 +694,11 @@
                                (if (even? moves) X O))
                   (iter (- moves 1) (cdr indices)))))))
       
-      (define (triplet->space-mark board triplet)
-        (map (lambda (i) (cons i (board-ref board i))) triplet))
-      
-      (define (for-each-triplet procedure board)
-        (for-each (lambda (triplet)
-                    (procedure (triplet->space-mark board triplet)))
-                  (triplets)))
-      
       (define (fold-triplet cons nil board)
         (fold (lambda (triplet accumulatum)
-                (cons (triplet->space-mark board triplet)
-                      accumulatum))
+                (cons triplet accumulatum))
               nil
               (triplets)))
-      
-      (define (empty-space-marks triplet)
-        (filter (compose empty? mark) triplet))
       
       (define (empty-spaces board)
         (vector-fold (lambda (space empty-spaces mark)
@@ -726,24 +708,23 @@
                      '()
                      board))
       
-      (define (first-empty-space triplet)
-        (let ((empty-space-marks (empty-space-marks triplet)))
-          (if (null? empty-space-marks)
-              #f
-              (space (car empty-space-marks)))))
+      ;;; Putting triplet first would allow you to use many boards.
+      (define (first-empty-space board triplet)
+        (find (cute empty? board <>) triplet))
       
-      (define (winning-triplet? player? triplet)
+      (define (winning-triplet? player? triplet board)
         (let ((non-player-marks
-               (map mark (filter (compose not player? mark) triplet))))
-          (equal? non-player-marks `(,ε))))
+               (filter (cute (complement player?) board <>) triplet)))
+          (equal? (map (cute board-ref board <>) non-player-marks)
+                  `(,ε))))
       
       ;;; The solutions here may be non-unique: in which case, we have a
       ;;; convergent fork.
       (define (winning-spaces player? board)
         (fold-triplet
          (lambda (triplet winning-spaces)
-           (if (winning-triplet? player? triplet)
-               (cons (first-empty-space triplet) winning-spaces)
+           (if (winning-triplet? player? triplet board)
+               (cons (first-empty-space board triplet) winning-spaces)
                winning-spaces))
          '()
          board))
@@ -758,12 +739,10 @@
                   (forking-space? player? player space board))
                 (empty-spaces board)))
       
-      (define (board-center-space-mark board)
-        (let ((center-space (/ (- (n-by-n) 1) 2)))
-          (cons center-space (board-ref board center-space))))
+      (define (center-space board) (/ (- (n-by-n) 1) 2))
       
       (define (center-empty? board)
-        (empty? (mark (board-center-space-mark board))))
+        (empty? board (center-space board)))
       
       (define (opposite-corners player? board)
         (let* ((corners (filter (lambda (corner)
