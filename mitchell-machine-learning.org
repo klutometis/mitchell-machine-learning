@@ -566,44 +566,57 @@
     Meh; maybe we can implement the [[wikipedia-strategy][X/O-agnostic heuristics]].
 
     #+BEGIN_SRC scheme :tangle tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
-      (use debug vector-lib srfi-1 test)
+      (use debug
+           vector-lib
+           srfi-1
+           test
+           srfi-26)
       
       (define n (make-parameter 3))
       
       (define (n-by-n)
-        (let ((n (n))) (* n n)))
+        (* (n) (n)))
       
       (define (row start)
         (iota (n) start))
       
       (define (column start)
-        (let ((n (n)))
-          (iota n start n)))
+        (iota (n) start (n)))
       
-      (define (nw-se-diagonal)
-        (let ((n (n)))
-          (iota n 0 (+ n 1))))
+      (define (a) 0)
       
-      (define (ne-sw-diagonal)
-        (let ((n (n)))
-          (iota n (- n 1) (- n 1))))
+      (define (b) (- (n) 1))
+      
+      (define (c) (- (n-by-n) 1))
+      
+      (define (d) (- (c) (- (n) 1)))
+      
+      (define (ac-diagonal)
+        (iota (n) (a) (+ (n) 1)))
+      
+      (define (bd-diagonal)
+        (iota (n) (b) (- (n) 1)))
       
       (define (rows)
-        (let ((n (n)))
-          (map row (iota n 0 n))))
+        (map row (iota (n) (a) (n))))
       
       (define (columns)
-        (let ((n (n)))
-          (map column (iota n))))
+        (map column (iota (n))))
       
       (define (diagonals)
-        (list (nw-se-diagonal)
-              (ne-sw-diagonal)))
+        (list (ac-diagonal)
+              (bd-diagonal)))
       
       (define (triplets)
         (append (rows)
                 (columns)
                 (diagonals)))
+      
+      (define (corners)
+        (list (a) (b) (c) (d)))
+      
+      (define (opposite-corner corner)
+        (- (n-by-n) corner 1))
       
       (define ε -1)
       
@@ -615,22 +628,22 @@
       
       (define mark cdr)
       
-      (define (X? space-mark)
-        (let ((mark (mark space-mark)))
-          (and mark (= X mark))))
+      ;;; Should we have corresponding predicates which take a board and
+      ;;; space?
+      (define X?
+        (case-lambda
+         ((mark) (= X mark))
+         ((board space) (X? (board-ref board space)))))
       
-      (define (O? space-mark)
-        (let ((mark (mark space-mark)))
-          (and mark (= O mark))))
+      (define O?
+        (case-lambda
+         ((mark) (= O mark))
+         ((board space) (O? (board-ref board space)))))
       
-      (define (empty? space-mark)
-        (not (mark space-mark)))
-      
-      (define (X? mark) (= X mark))
-      
-      (define (O? mark) (= O mark))
-      
-      (define (empty? mark) (= ε mark))
+      (define empty?
+        (case-lambda
+         ((mark) (= ε mark))
+         ((board space) (empty? (board-ref board space)))))
       
       (define make-board make-vector)
       
@@ -641,6 +654,20 @@
       (define board-set! vector-set!)
       
       (define board-copy vector-copy)
+      
+      (define (board->string board)
+        (apply format
+               "~a│~a│~a~%─┼─┼─~%~a│~a│~a~%─┼─┼─~%~a│~a│~a~%"
+               (vector->list
+                (vector-map
+                 (lambda (i mark)
+                   (cond ((X? mark) "X")
+                         ((O? mark) "O")
+                         (else " ")))
+                 board))))
+      
+      (define (display-board board)
+        (display (board->string board)))
       
       (define (make-empty-board)
         (make-board (n-by-n) ε))
@@ -738,19 +765,15 @@
       (define (center-empty? board)
         (empty? (mark (board-center-space-mark board))))
       
-      (define (board->string board)
-        (apply format
-               "~a│~a│~a~%─┼─┼─~%~a│~a│~a~%─┼─┼─~%~a│~a│~a~%"
-               (vector->list
-                (vector-map
-                 (lambda (i mark)
-                   (cond ((X? mark) "X")
-                         ((O? mark) "O")
-                         (else " ")))
-                 board))))
-      
-      (define (display-board board)
-        (display (board->string board)))
+      (define (opposite-corners player? board)
+        (let* ((corners (filter (lambda (corner)
+                                  (player? (board-ref board corner)))
+                                (corners)))
+               (opposite-corners
+                (map opposite-corner corners)))
+          (filter (lambda (opposite-corner)
+                    (empty? board opposite-corner))
+                  opposite-corners)))
       
       (let ((board (board X X ε
                           O O X
@@ -786,5 +809,27 @@
         (test-assert "center-empty? on non-empty board"
                      (not (center-empty? board))))
       
+      (let ((board (board X ε ε
+                          ε ε ε
+                          X ε ε)))
+        (test "opposite-corners"
+              '(8 2)
+              (opposite-corners X? board)))
     #+END_SRC
 
+    Instead of this heuristics-based approach, we could map out the
+    entire game tree from any arbitrary position; either in real time,
+    or before: greedily picking whichever position yields the most
+    wins.
+
+    Maybe that's better; should we plot it as an alternative to the
+    heuristics-based player: the deterministic player?
+
+    Each node has three values: wins for X, wins for O, draws; it may
+    be possible to do it functionally through memoization: let's just
+    ascend up the tree when we've explored a child, however, and
+    update the parent accordingly.
+
+    W.r.t. the heuristic player, by the way, can't we get rid of
+    =space-marks= and rely on =board-ref= instead? Triplets (tuplets)
+    are just lists of indices, then. Good call.
