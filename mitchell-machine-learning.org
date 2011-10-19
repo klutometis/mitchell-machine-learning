@@ -616,6 +616,8 @@
       
       (define make-board make-vector)
       
+      (define board-ref vector-ref)
+      
       (define board-set! vector-set!)
       
       (define board-copy vector-copy)
@@ -652,7 +654,7 @@
                   (iter (- moves 1) (cdr indices)))))))
       
       (define (triplet->space-mark board triplet)
-        (map (lambda (i) (cons i (vector-ref board i))) triplet))
+        (map (lambda (i) (cons i (board-ref board i))) triplet))
       
       (define (for-each-triplet procedure board)
         (for-each (lambda (triplet)
@@ -709,6 +711,13 @@
                   (forking-space? player? player space board))
                 (empty-spaces board)))
       
+      (define (board-center-space-mark board)
+        (let ((center-space (/ (- n-spaces 1) 2)))
+          (cons center-space (board-ref board center-space))))
+      
+      (define (center-empty? board)
+        (empty? (mark (board-center-space-mark board))))
+      
       (define (board->string board)
         (apply format
                "~a│~a│~a~%─┼─┼─~%~a│~a│~a~%─┼─┼─~%~a│~a│~a~%"
@@ -723,6 +732,11 @@
       (define (display-board board)
         (display (board->string board)))
       
+      ;; X│X│ 
+      ;; ─┼─┼─
+      ;; O│O│X
+      ;; ─┼─┼─
+      ;; O│O│X
       (let ((board `#(0 0 ,ε 1 1 0 1 1 0)))
         (test "winning-spaces with X"
               '(2 2)
@@ -731,15 +745,44 @@
               '(2)
               (winning-spaces O? board)))
       
+      ;; X│X│ 
+      ;; ─┼─┼─
+      ;; O│O│X
+      ;; ─┼─┼─
+      ;; O│ │X
       (let ((board `#(0 0 ,ε 1 1 0 1 ,ε 0)))
         (test "empty-spaces"
               '(7 2)
               (empty-spaces board)))
       
+      ;; X│ │ 
+      ;; ─┼─┼─
+      ;;  │X│O
+      ;; ─┼─┼─
+      ;;  │ │O
       (let ((board `#(0 ,ε ,ε ,ε 0 1 ,ε ,ε 1)))
         (test "forking-spaces"
               '(6 2 1)
               (forking-spaces X? X board)))
+      
+      ;;  │ │ 
+      ;; ─┼─┼─
+      ;;  │ │ 
+      ;; ─┼─┼─
+      ;;  │ │ 
+      (let ((board-center-empty (make-empty-board)))
+        (test-assert "center-empty? on empty board"
+                     (center-empty? board-center-empty)))
+      
+      ;;  │ │ 
+      ;; ─┼─┼─
+      ;;  │X│ 
+      ;; ─┼─┼─
+      ;;  │ │ 
+      (let ((board-center-not-empty
+             `#(,ε ,ε ,ε ,ε ,X ,ε ,ε ,ε ,ε)))
+        (test-assert "center-empty? on non-empty board"
+                     (not (center-empty? board-center-not-empty))))
       
     #+END_SRC
 
