@@ -585,6 +585,8 @@
       (define triplets
         (append rows columns diagonals))
       
+      (define n-spaces 9)
+      
       (define ε -1)
       
       (define X 0)
@@ -612,8 +614,14 @@
       
       (define (empty? mark) (= ε mark))
       
+      (define make-board make-vector)
+      
+      (define board-set! vector-set!)
+      
+      (define board-copy vector-copy)
+      
       (define (make-empty-board)
-        (make-vector 9 ε))
+        (make-board n-spaces ε))
       
       ;;; Functional variant of Knuth shuffle: partitions the cards around a
       ;;; random pivot, takes the first card of the right-partition, repeat.
@@ -630,11 +638,9 @@
                            (append left-partition (cdr right-partition)))))))))
       
       (define (make-random-board)
-        (let ((board (make-empty-board))
-              (moves (random 9))
-              (indices (shuffle (iota 9))))
-          (let iter ((moves moves)
-                     (indices indices))
+        (let ((board (make-empty-board)))
+          (let iter ((moves (random n-spaces))
+                     (indices (shuffle (iota n-spaces))))
             (if (zero? moves)
                 board
                 (let ((mark (random (length indices))))
@@ -660,19 +666,27 @@
               nil
               triplets))
       
-      (define (winning-triplet? player? triplet)
-        (let ((non-player-marks
-               (map mark (filter (compose not player? mark) triplet))))
-          (equal? non-player-marks `(,ε))))
-      
       (define (empty-space-marks triplet)
         (filter (compose empty? mark) triplet))
+      
+      (define (empty-spaces board)
+        (vector-fold (lambda (space empty-spaces mark)
+                       (if (empty? mark)
+                           (cons space empty-spaces)
+                           empty-spaces))
+                     '()
+                     board))
       
       (define (first-empty-space triplet)
         (let ((empty-space-marks (empty-space-marks triplet)))
           (if (null? empty-space-marks)
               #f
               (space (car empty-space-marks)))))
+      
+      (define (winning-triplet? player? triplet)
+        (let ((non-player-marks
+               (map mark (filter (compose not player? mark) triplet))))
+          (equal? non-player-marks `(,ε))))
       
       ;;; The solutions here may be non-unique: in which case, we have a
       ;;; convergent fork.
@@ -684,6 +698,16 @@
                winning-spaces))
          '()
          board))
+      
+      (define (forking-space? player? player space board)
+        (let ((board (board-copy board)))
+          (board-set! board space player)
+          (> (length (winning-spaces player? board)) 1)))
+      
+      (define (forking-spaces player? player board)
+        (filter (lambda (space)
+                  (forking-space? player? player space board))
+                (empty-spaces board)))
       
       (define (board->string board)
         (apply format
@@ -700,15 +724,22 @@
         (display (board->string board)))
       
       (let ((board `#(0 0 ,ε 1 1 0 1 1 0)))
-        (display-board board)
-        (test '(2 2) (winning-spaces X? board))
-        (test '(2) (winning-spaces O? board)))
+        (test "winning-spaces with X"
+              '(2 2)
+              (winning-spaces X? board))
+        (test "winning-spaces with O"
+              '(2)
+              (winning-spaces O? board)))
       
-      #;
-      (let ((board (make-random-board)))
-        (display-board board)
-        (debug (wins X? board)
-               (wins O? board)))
+      (let ((board `#(0 0 ,ε 1 1 0 1 ,ε 0)))
+        (test "empty-spaces"
+              '(7 2)
+              (empty-spaces board)))
+      
+      (let ((board `#(0 ,ε ,ε ,ε 0 1 ,ε ,ε 1)))
+        (test "forking-spaces"
+              '(6 2 1)
+              (forking-spaces X? X board)))
       
     #+END_SRC
 
