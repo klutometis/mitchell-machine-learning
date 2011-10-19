@@ -736,11 +736,6 @@
       (define (display-board board)
         (display (board->string board)))
       
-      ;; X│X│ 
-      ;; ─┼─┼─
-      ;; O│O│X
-      ;; ─┼─┼─
-      ;; O│O│X
       (let ((board (board X X ε
                           O O X
                           O O X)))
@@ -751,11 +746,6 @@
               '(2)
               (winning-spaces O? board)))
       
-      ;; X│X│ 
-      ;; ─┼─┼─
-      ;; O│O│X
-      ;; ─┼─┼─
-      ;; O│ │X
       (let ((board (board X X ε
                           O O X
                           O ε X)))
@@ -763,11 +753,6 @@
               '(7 2)
               (empty-spaces board)))
       
-      ;; X│ │ 
-      ;; ─┼─┼─
-      ;;  │X│O
-      ;; ─┼─┼─
-      ;;  │ │O
       (let ((board (board X ε ε
                           ε X O
                           ε ε O)))
@@ -775,20 +760,10 @@
               '(6 2 1)
               (forking-spaces X? X board)))
       
-      ;;  │ │ 
-      ;; ─┼─┼─
-      ;;  │ │ 
-      ;; ─┼─┼─
-      ;;  │ │ 
       (let ((board (make-empty-board)))
         (test-assert "center-empty? on empty board"
                      (center-empty? board)))
       
-      ;;  │ │ 
-      ;; ─┼─┼─
-      ;;  │X│ 
-      ;; ─┼─┼─
-      ;;  │ │ 
       (let ((board (board ε ε ε
                           ε X ε
                           ε ε ε)))
