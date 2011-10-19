@@ -953,4 +953,7 @@
     win-draw-loss?
 
     Let's compute the tree in real time to see what sort of complexity
-    we're dealing with; then we can think about optimizing.
+    we're dealing with; then we can think about optimizing. Since we
+    have a stateful player, let's memoized by history; even though
+    there are equivalent branches. We might be able to use [[http://en.wikipedia.org/wiki/Tic-tac-toe#Number_of_terminal_positions][rotation]] to
+    prune the terminal positions linearly.
