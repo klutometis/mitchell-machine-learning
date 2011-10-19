@@ -956,4 +956,4 @@
     we're dealing with; then we can think about optimizing. Since we
     have a stateful player, let's memoized by history; even though
     there are equivalent branches. We might be able to use [[http://en.wikipedia.org/wiki/Tic-tac-toe#Number_of_terminal_positions][rotation]] to
-    prune the terminal positions linearly.
+    prune the terminal [[http://en.wikipedia.org/wiki/Tic-tac-toe#Number_of_possible_games][by a factor of ten]].
