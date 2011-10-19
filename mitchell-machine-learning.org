@@ -564,46 +564,151 @@
     Meh; maybe we can implement the [[wikipedia-strategy][X/O-agnostic heuristics]].
 
     #+BEGIN_SRC scheme :tangle tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
-      (use debug srfi-1)
-
-      (define (make-board)
-        (make-vector 9 #f))
-
+      (use debug vector-lib srfi-1 test)
+      
+      ;;; To generalize to an n x n board, we'll have to resort to modulus
+      ;;; and rotation.
       (define rows
         '((0 1 2)
           (3 4 5)
           (6 7 8)))
-
+      
       (define columns
         '((0 3 6)
           (1 4 7)
           (2 5 8)))
-
+      
       (define diagonals
         '((0 4 8)
           (2 4 6)))
-
+      
       (define triplets
         (append rows columns diagonals))
-
-      (define (triplet->index-value board triplet)
+      
+      (define ε -1)
+      
+      (define X 0)
+      
+      (define O 1)
+      
+      (define space car)
+      
+      (define mark cdr)
+      
+      (define (X? space-mark)
+        (let ((mark (mark space-mark)))
+          (and mark (= X mark))))
+      
+      (define (O? space-mark)
+        (let ((mark (mark space-mark)))
+          (and mark (= O mark))))
+      
+      (define (empty? space-mark)
+        (not (mark space-mark)))
+      
+      (define (X? mark) (= X mark))
+      
+      (define (O? mark) (= O mark))
+      
+      (define (empty? mark) (= ε mark))
+      
+      (define (make-empty-board)
+        (make-vector 9 ε))
+      
+      ;;; Functional variant of Knuth shuffle: partitions the cards around a
+      ;;; random pivot, takes the first card of the right-partition, repeat.
+      (define shuffle
+        (case-lambda
+         ((deck) (shuffle '() deck))
+         ((shuffled-deck deck)
+          (if (null? deck)
+              shuffled-deck
+              (let ((pivot (random (length deck))))
+                (let ((left-partition (take deck pivot))
+                      (right-partition (drop deck pivot)))
+                  (shuffle (cons (car right-partition) shuffled-deck)
+                           (append left-partition (cdr right-partition)))))))))
+      
+      (define (make-random-board)
+        (let ((board (make-empty-board))
+              (moves (random 9))
+              (indices (shuffle (iota 9))))
+          (let iter ((moves moves)
+                     (indices indices))
+            (if (zero? moves)
+                board
+                (let ((mark (random (length indices))))
+                  ;; You may end up with a board where there are more Os
+                  ;; than Xs.
+                  (vector-set! board
+                               (car indices)
+                               (if (even? moves) X O))
+                  (iter (- moves 1) (cdr indices)))))))
+      
+      (define (triplet->space-mark board triplet)
         (map (lambda (i) (cons i (vector-ref board i))) triplet))
-
+      
       (define (for-each-triplet procedure board)
         (for-each (lambda (triplet)
-                    (procedure (triplet->index-value board triplet)))
+                    (procedure (triplet->space-mark board triplet)))
                   triplets))
-
+      
       (define (fold-triplet cons nil board)
         (fold (lambda (triplet accumulatum)
-                #;(debug triplet accumulatum)
-                (cons (triplet->index-value board triplet)
+                (cons (triplet->space-mark board triplet)
                       accumulatum))
               nil
               triplets))
-
-      (let ((board (make-board)))
-        (debug (for-each-triplet display board)
-               (fold-triplet cons '() board)))     
+      
+      (define (winning-triplet? player? triplet)
+        (let ((non-player-marks
+               (map mark (filter (compose not player? mark) triplet))))
+          (equal? non-player-marks `(,ε))))
+      
+      (define (empty-space-marks triplet)
+        (filter (compose empty? mark) triplet))
+      
+      (define (first-empty-space triplet)
+        (let ((empty-space-marks (empty-space-marks triplet)))
+          (if (null? empty-space-marks)
+              #f
+              (space (car empty-space-marks)))))
+      
+      ;;; The solutions here may be non-unique: in which case, we have a
+      ;;; convergent fork.
+      (define (winning-spaces player? board)
+        (fold-triplet
+         (lambda (triplet winning-spaces)
+           (if (winning-triplet? player? triplet)
+               (cons (first-empty-space triplet) winning-spaces)
+               winning-spaces))
+         '()
+         board))
+      
+      (define (board->string board)
+        (apply format
+               "~a│~a│~a~%─┼─┼─~%~a│~a│~a~%─┼─┼─~%~a│~a│~a~%"
+               (vector->list
+                (vector-map
+                 (lambda (i mark)
+                   (cond ((X? mark) "X")
+                         ((O? mark) "O")
+                         (else " ")))
+                 board))))
+      
+      (define (display-board board)
+        (display (board->string board)))
+      
+      (let ((board `#(0 0 ,ε 1 1 0 1 1 0)))
+        (display-board board)
+        (test '(2 2) (winning-spaces X? board))
+        (test '(2) (winning-spaces O? board)))
+      
+      #;
+      (let ((board (make-random-board)))
+        (display-board board)
+        (debug (wins X? board)
+               (wins O? board)))
+      
     #+END_SRC
 
