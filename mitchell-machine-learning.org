@@ -1,4 +1,6 @@
 #+TITLE: Some notes and solutions to Tom Mitchell's \emph{Machine Learning} (McGraw Hill, 1997)
+* TODO An empty module that gathers the exercises' dependencies
+  such that running =chicken-install -s= installs them.
 * Exercises
 ** DONE 1.1
    CLOSED: [2011-10-12 Wed 04:21]
@@ -616,6 +618,8 @@
       
       (define make-board make-vector)
       
+      (define board vector)
+      
       (define board-ref vector-ref)
       
       (define board-set! vector-set!)
@@ -737,7 +741,9 @@
       ;; O│O│X
       ;; ─┼─┼─
       ;; O│O│X
-      (let ((board `#(0 0 ,ε 1 1 0 1 1 0)))
+      (let ((board (board X X ε
+                          O O X
+                          O O X)))
         (test "winning-spaces with X"
               '(2 2)
               (winning-spaces X? board))
@@ -750,7 +756,9 @@
       ;; O│O│X
       ;; ─┼─┼─
       ;; O│ │X
-      (let ((board `#(0 0 ,ε 1 1 0 1 ,ε 0)))
+      (let ((board (board X X ε
+                          O O X
+                          O ε X)))
         (test "empty-spaces"
               '(7 2)
               (empty-spaces board)))
@@ -760,7 +768,9 @@
       ;;  │X│O
       ;; ─┼─┼─
       ;;  │ │O
-      (let ((board `#(0 ,ε ,ε ,ε 0 1 ,ε ,ε 1)))
+      (let ((board (board X ε ε
+                          ε X O
+                          ε ε O)))
         (test "forking-spaces"
               '(6 2 1)
               (forking-spaces X? X board)))
@@ -770,19 +780,20 @@
       ;;  │ │ 
       ;; ─┼─┼─
       ;;  │ │ 
-      (let ((board-center-empty (make-empty-board)))
+      (let ((board (make-empty-board)))
         (test-assert "center-empty? on empty board"
-                     (center-empty? board-center-empty)))
+                     (center-empty? board)))
       
       ;;  │ │ 
       ;; ─┼─┼─
       ;;  │X│ 
       ;; ─┼─┼─
       ;;  │ │ 
-      (let ((board-center-not-empty
-             `#(,ε ,ε ,ε ,ε ,X ,ε ,ε ,ε ,ε)))
+      (let ((board (board ε ε ε
+                          ε X ε
+                          ε ε ε)))
         (test-assert "center-empty? on non-empty board"
-                     (not (center-empty? board-center-not-empty))))
+                     (not (center-empty? board))))
       
     #+END_SRC
 
