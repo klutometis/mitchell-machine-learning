@@ -755,6 +755,9 @@
                     (empty? board opposite-corner))
                   opposite-corners)))
       
+      (define (empty-corners board)
+        (filter (cute empty? board <>) (corners)))
+      
       (define (random-ref list)
         (list-ref list (random (length list))))
       
@@ -846,21 +849,47 @@
         (test-assert "No outcome yet"
                      (not (outcome board))))
       
-      (define (make-random-player player player?)
+      (define (make-random-player player? player opponent? opponent)
         (lambda (board)
           (random-empty-space board)))
       
+      ;;; http://www.buzzle.com/articles/tic-tac-toe-strategy-guide.html
+      (define (make-heuristic-player player? player opponent? opponent)
+        (lambda (board)
+          (let ((my-winning-spaces (winning-spaces player? board)))
+            (if (null? my-winning-spaces)
+                (let ((losing-spaces (winning-spaces opponent? board)))
+                  (if (null? losing-spaces)
+                      (let ((my-forking-spaces (forking-spaces player? player board)))
+                        (if (null? my-forking-spaces)
+                            (let ((opponent-forking-spaces
+                                   (forking-spaces opponent? opponent board)))
+                              (if (null? opponent-forking-spaces)
+                                  (if (center-empty? board)
+                                      (center-space board)
+                                      (let ((opposite-corners (opposite-corners player? board)))
+                                        (if (null? opposite-corners)
+                                            (let ((empty-corners (empty-corners board)))
+                                              (if (null? empty-corners)
+                                                  (random-empty-space board)
+                                                  (random-ref empty-corners)))
+                                            (random-ref opposite-corners))))
+                                  (random-ref opponent-forking-spaces)))
+                            (random-ref my-forking-spaces)))
+                      (random-ref losing-spaces)))
+                (random-ref my-winning-spaces)))))
+      
       ;;; This shit probably has to go.
       (define make-default-player
-        (make-parameter make-random-player))
+        (make-parameter make-heuristic-player))
       
       (define play
         (case-lambda
          (()
           (play (make-empty-board)))
          ((board)
-          (play ((make-default-player) X X?)
-                ((make-default-player) O O?)
+          (play ((make-default-player) X? X O? O)
+                ((make-default-player) O? O X? X)
                 board))
          ((X-player O-player board)
           (play 0 X-player O-player board))
