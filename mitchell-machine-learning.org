@@ -568,26 +568,42 @@
     #+BEGIN_SRC scheme :tangle tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
       (use debug vector-lib srfi-1 test)
       
-      ;;; To generalize to an n x n board, we'll have to resort to modulus
-      ;;; and rotation.
-      (define rows
-        '((0 1 2)
-          (3 4 5)
-          (6 7 8)))
+      (define n (make-parameter 3))
       
-      (define columns
-        '((0 3 6)
-          (1 4 7)
-          (2 5 8)))
+      (define (n-by-n)
+        (let ((n (n))) (* n n)))
       
-      (define diagonals
-        '((0 4 8)
-          (2 4 6)))
+      (define (row start)
+        (iota (n) start))
       
-      (define triplets
-        (append rows columns diagonals))
+      (define (column start)
+        (let ((n (n)))
+          (iota n start n)))
       
-      (define n-spaces 9)
+      (define (nw-se-diagonal)
+        (let ((n (n)))
+          (iota n 0 (+ n 1))))
+      
+      (define (ne-sw-diagonal)
+        (let ((n (n)))
+          (iota n (- n 1) (- n 1))))
+      
+      (define (rows)
+        (let ((n (n)))
+          (map row (iota n 0 n))))
+      
+      (define (columns)
+        (let ((n (n)))
+          (map column (iota n))))
+      
+      (define (diagonals)
+        (list (nw-se-diagonal)
+              (ne-sw-diagonal)))
+      
+      (define (triplets)
+        (append (rows)
+                (columns)
+                (diagonals)))
       
       (define ε -1)
       
@@ -627,7 +643,7 @@
       (define board-copy vector-copy)
       
       (define (make-empty-board)
-        (make-board n-spaces ε))
+        (make-board (n-by-n) ε))
       
       ;;; Functional variant of Knuth shuffle: partitions the cards around a
       ;;; random pivot, takes the first card of the right-partition, repeat.
@@ -645,8 +661,8 @@
       
       (define (make-random-board)
         (let ((board (make-empty-board)))
-          (let iter ((moves (random n-spaces))
-                     (indices (shuffle (iota n-spaces))))
+          (let iter ((moves (random (n-by-n)))
+                     (indices (shuffle (iota (n-by-n)))))
             (if (zero? moves)
                 board
                 (let ((mark (random (length indices))))
@@ -663,14 +679,14 @@
       (define (for-each-triplet procedure board)
         (for-each (lambda (triplet)
                     (procedure (triplet->space-mark board triplet)))
-                  triplets))
+                  (triplets)))
       
       (define (fold-triplet cons nil board)
         (fold (lambda (triplet accumulatum)
                 (cons (triplet->space-mark board triplet)
                       accumulatum))
               nil
-              triplets))
+              (triplets)))
       
       (define (empty-space-marks triplet)
         (filter (compose empty? mark) triplet))
@@ -716,7 +732,7 @@
                 (empty-spaces board)))
       
       (define (board-center-space-mark board)
-        (let ((center-space (/ (- n-spaces 1) 2)))
+        (let ((center-space (/ (- (n-by-n) 1) 2)))
           (cons center-space (board-ref board center-space))))
       
       (define (center-empty? board)
