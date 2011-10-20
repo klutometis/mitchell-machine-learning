@@ -649,6 +649,8 @@
       
       (define board-copy vector-copy)
       
+      (define board->list vector->list)
+      
       (define (board->string board)
         (apply format
                "~a│~a│~a~%─┼─┼─~%~a│~a│~a~%─┼─┼─~%~a│~a│~a~%"
@@ -966,8 +968,12 @@
     prune the terminal [[http://en.wikipedia.org/wiki/Tic-tac-toe#Number_of_possible_games][by a factor of ten]].
 
     #+BEGIN_SRC scheme :tangle deterministic-tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
-      (use debug
-           srfi-9)
+      (use
+       debug
+       srfi-9
+       srfi-69
+       )
+      
       (include "tic-tac-toe.scm")
       
       (define-record move
@@ -1015,17 +1021,44 @@
                                  (plumb board))))
                        empty-spaces))))))
       
-      (define (update-parents! outcome move)
-        (let ascend ((move move))
-          (if move
-              (begin
-                (cond ((X-win? outcome)
-                       (move-X-wins-set! move (+ 1 (move-X-wins move))))
-                      ((O-win? outcome)
-                       (move-O-wins-set! move (+ 1 (move-O-wins move))))
-                      (else
-                       (move-draws-set! move (+ 1 (move-draws move)))))
-                (ascend (move-parent move))))))
+      (define (hash-board board)
+        (list->string (map integer->char (board->list board))))
+      
+      (define (update-parents! hash board outcome move)
+        (let ((board (board-copy board)))
+          (let ascend ((move move))
+            (if move
+                (begin
+                  ;; (display-board board)
+                  (cond ((X-win? outcome)
+                         (move-X-wins-set! move (+ 1 (move-X-wins move)))
+                         (hash-table-update!/default
+                          hash
+                          (hash-board board)
+                          (lambda (move)
+                            (move-X-wins-set! move (+ 1 (move-X-wins move)))
+                            move)
+                          (make-move #f 0 0 0 0)))
+                        ((O-win? outcome)
+                         (move-O-wins-set! move (+ 1 (move-O-wins move)))
+                         (hash-table-update!/default
+                          hash
+                          (hash-board board)
+                          (lambda (move)
+                            (move-O-wins-set! move (+ 1 (move-O-wins move)))
+                            move)
+                          (make-move #f 0 0 0 0)))
+                        (else
+                         (move-draws-set! move (+ 1 (move-draws move)))
+                         (hash-table-update!/default
+                          hash
+                          (hash-board board)
+                          (lambda (move)
+                            (move-draws-set! move (+ 1 (move-draws move)))
+                            move)
+                          (make-move #f 0 0 0 0))))
+                  (board-set! board (move-space move) ε)
+                  (ascend (move-parent move)))))))
       
       ;;; We should be able to flatten this considerably, since the
       ;;; game-state is history-agnostic (context-free); not to mention
@@ -1033,11 +1066,11 @@
       ;;;
       ;;; Can we flatten this by hashing the game state and updating it as
       ;;; though it were a tree (by e.g. mapping parents to hashes as well)?
-      (define (plumb move board)
+      (define (plumb hash move board)
         ;; (display-board board)
         (let ((outcome (outcome board)))
           (if outcome
-              (begin (update-parents! outcome move)
+              (begin (update-parents! hash board outcome move)
                      ;; Could just cap the tree here with a '(), too.
                      ;; outcome
                      '())
@@ -1051,19 +1084,16 @@
                            (cons new-move
                             (let ((board (board-copy board)))
                               (board-set! board empty-space player)
-                              (plumb new-move board)))))
+                              (plumb hash new-move board)))))
                        empty-spaces))))))
       
       #;
-      (define (make-deterministic-player)
-        (lambda (board)
-          ))
-      
-      
       (let ((board (board X ε ε
                           O ε ε
-                          O ε X)))
-        (plumb #f board))
+                          O ε X))
+            (hash (make-hash-table)))
+        (time (plumb hash #f (make-empty-board)))
+        (debug (hash-table->alist hash)))
       
       #;
       (let ((board (make-empty-board)))
@@ -1071,9 +1101,23 @@
             "tic-tac-toe-game-tree.scm"
           (lambda () (write (plumb #f board)))))
       
-      (time (with-input-from-file
-                "tic-tac-toe-game-tree.scm"
-              read))
+      #;
+        (let ((board (make-empty-board)))
+          (with-output-to-file
+              "tic-tac-toe-hash-table.scm"
+            (lambda ()
+              (let ((hash (make-hash-table)))
+                (plumb hash #f board)
+                (write (hash-table->alist hash))))))
+      
+        #;
+        (time (with-input-from-file
+                  "tic-tac-toe-game-tree.scm"
+                read))
+      
+        (debug (time (with-input-from-file
+                   "tic-tac-toe-hash-table.scm"
+                 read)))
       
     #+END_SRC
 
