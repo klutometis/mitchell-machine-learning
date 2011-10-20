@@ -565,13 +565,12 @@
 
     Meh; maybe we can implement the [[wikipedia-strategy][X/O-agnostic heuristics]].
 
-    #+BEGIN_SRC scheme :tangle tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
+    #+BEGIN_SRC scheme :tangle tic-tac-toe.scm
       (use debug
            vector-lib
            srfi-1
            srfi-11
-           srfi-26
-           test)
+           srfi-26)
       
       (define n (make-parameter 3))
       
@@ -764,50 +763,6 @@
       (define (random-empty-space board)
         (random-ref (empty-spaces board)))
       
-      (let ((board (board X X ε
-                          O O X
-                          O O X)))
-        (test "winning-spaces with X"
-              '(2 2)
-              (winning-spaces X? board))
-        (test "winning-spaces with O"
-              '(2)
-              (winning-spaces O? board)))
-      
-      (let ((board (board X X ε
-                          O O X
-                          O ε X)))
-        (test "empty-spaces"
-              '(7 2)
-              (empty-spaces board)))
-      
-      (let ((board (board X ε ε
-                          ε X O
-                          ε ε O)))
-        (test "forking-spaces"
-              '(6 2 1)
-              (forking-spaces X? X board)))
-      
-      (let ((board (make-empty-board)))
-        (test-assert "center-empty? on empty board"
-                     (center-empty? board)))
-      
-      (let ((board (board ε ε ε
-                          ε X ε
-                          ε ε ε)))
-        (test-assert "center-empty? on non-empty board"
-                     (not (center-empty? board))))
-      
-      (let ((board (board X ε ε
-                          ε ε ε
-                          X ε ε)))
-        (test "opposite-corners"
-              '(8 2)
-              (opposite-corners X? board)))
-      
-      (let ((board (make-empty-board)))
-        (test-assert "random-empty-space"
-                     (< (random-empty-space board) (n-by-n))))
       
       (define (win? player? board)
         (fold-tuplet
@@ -827,27 +782,6 @@
               ((win? O? board) O)
               ((null? (empty-spaces board)) ε)
               (else #f)))
-      
-      (let* ((board (board X ε ε
-                           X O O
-                           X ε ε))
-             (outcome (outcome board)))
-        (test-assert "Win for X"
-                     (X-win? outcome))
-        (test-assert "No win for O"
-                     (not (O-win? outcome))))
-      
-      (let ((board (board O X O
-                          X O O
-                          X O X)))
-        (test-assert "Draw outcome"
-                     (draw? (outcome board))))
-      
-      (let ((board (board O X O
-                          X O O
-                          X O ε)))
-        (test-assert "No outcome yet"
-                     (not (outcome board))))
       
       (define (make-random-player player? player opponent? opponent)
         (lambda (board)
@@ -908,8 +842,81 @@
                         O-player
                         board)))))))
       
-      (debug (play))
+    #+END_SRC
+
+    #+BEGIN_SRC scheme :tangle test-tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
+      (use test
+           debug)
       
+      (include "tic-tac-toe.scm")
+      
+      (let ((board (board X X ε
+                          O O X
+                          O O X)))
+        (test "winning-spaces with X"
+              '(2 2)
+              (winning-spaces X? board))
+        (test "winning-spaces with O"
+              '(2)
+              (winning-spaces O? board)))
+      
+      (let ((board (board X X ε
+                          O O X
+                          O ε X)))
+        (test "empty-spaces"
+              '(7 2)
+              (empty-spaces board)))
+      
+      (let ((board (board X ε ε
+                          ε X O
+                          ε ε O)))
+        (test "forking-spaces"
+              '(6 2 1)
+              (forking-spaces X? X board)))
+      
+      (let ((board (make-empty-board)))
+        (test-assert "center-empty? on empty board"
+                     (center-empty? board)))
+      
+      (let ((board (board ε ε ε
+                          ε X ε
+                          ε ε ε)))
+        (test-assert "center-empty? on non-empty board"
+                     (not (center-empty? board))))
+      
+      (let ((board (board X ε ε
+                          ε ε ε
+                          X ε ε)))
+        (test "opposite-corners"
+              '(8 2)
+              (opposite-corners X? board)))
+      
+      (let ((board (make-empty-board)))
+        (test-assert "random-empty-space"
+                     (< (random-empty-space board) (n-by-n))))
+      
+      (let* ((board (board X ε ε
+                           X O O
+                           X ε ε))
+             (outcome (outcome board)))
+        (test-assert "Win for X"
+                     (X-win? outcome))
+        (test-assert "No win for O"
+                     (not (O-win? outcome))))
+      
+      (let ((board (board O X O
+                          X O O
+                          X O X)))
+        (test-assert "Draw outcome"
+                     (draw? (outcome board))))
+      
+      (let ((board (board O X O
+                          X O O
+                          X O ε)))
+        (test-assert "No outcome yet"
+                     (not (outcome board))))
+      
+      (debug (play))      
     #+END_SRC
 
     Instead of this heuristics-based approach, we could map out the
@@ -957,3 +964,97 @@
     have a stateful player, let's memoized by history; even though
     there are equivalent branches. We might be able to use [[http://en.wikipedia.org/wiki/Tic-tac-toe#Number_of_terminal_positions][rotation]] to
     prune the terminal [[http://en.wikipedia.org/wiki/Tic-tac-toe#Number_of_possible_games][by a factor of ten]].
+
+    #+BEGIN_SRC scheme :tangle deterministic-tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
+      (use debug
+           srfi-9)
+      (include "tic-tac-toe.scm")
+      
+      (define-record move
+        parent
+        space
+        X-wins
+        O-wins
+        draws)
+      
+      (define-record-printer move
+        (lambda (move out)
+          (format out
+                  "#<move space: ~a X-wins: ~a O-wins: ~a draws: ~a>"
+                  (move-space move)
+                  (move-X-wins move)
+                  (move-O-wins move)
+                  (move-draws move))))
+      
+      ;;; Simple plumb without update
+      (define (plumb board)
+        (let ((outcome (outcome board)))
+          (or outcome
+              (let ((empty-spaces (empty-spaces board)))
+                (let-values (((player player?)
+                              (if (odd? (length empty-spaces))
+                                  (values X X?)
+                                  (values O O?))))
+                  (map (lambda (empty-space)
+                         (cons empty-space
+                               (let ((board (board-copy board)))
+                                 (board-set! board empty-space player)
+                                 (plumb board))))
+                       empty-spaces))))))
+      
+      (define (update-parents! outcome move)
+        (let ascend ((move move))
+          (if move
+              (begin
+                (cond ((X-win? outcome)
+                       (move-X-wins-set! move (+ 1 (move-X-wins move))))
+                      ((O-win? outcome)
+                       (move-O-wins-set! move (+ 1 (move-O-wins move))))
+                      (else
+                       (move-draws-set! move (+ 1 (move-draws move)))))
+                (ascend (move-parent move))))))
+      
+      (define (plumb move board)
+        ;; (display-board board)
+        (let ((outcome (outcome board)))
+          (if outcome
+              (begin (update-parents! outcome move)
+                     ;; Could just cap the tree here with a '(), too.
+                     ;; outcome
+                     '())
+              (let ((empty-spaces (empty-spaces board)))
+                (let-values (((player player?)
+                              (if (odd? (length empty-spaces))
+                                  (values X X?)
+                                  (values O O?))))
+                  (map (lambda (empty-space)
+                         (let ((new-move (make-move move empty-space 0 0 0)))
+                           (cons new-move
+                            (let ((board (board-copy board)))
+                              (board-set! board empty-space player)
+                              (plumb new-move board)))))
+                       empty-spaces))))))
+      
+      #;
+      (let ((board (board X ε ε
+                          O ε ε
+                          O ε X)))
+        (debug (plumb #f board)))
+      
+      (let ((board (make-empty-board)))
+        (debug (plumb #f board)))
+      
+    #+END_SRC
+
+    Deterministic TTT will look like a tree with complete games as
+    leaves; the tree is not complete. Eventually: every node should
+    have summary statistics: wins, draws, losses. Moving algorithm:
+    maximize wins; otherwise, maximize draws; otherwise, minimize
+    losses.
+
+    Each node will contain: square, wins, draws, losses. The player
+    moving is implicit: it depends upon the root and alternates. Root
+    is always X, though.
+
+    Can we implement the game tree as some kind of priority queue? It
+    will, nevertheless, be a tree of queues.
