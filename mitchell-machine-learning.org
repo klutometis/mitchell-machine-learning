@@ -977,6 +977,7 @@
         O-wins
         draws)
       
+      #;
       (define-record-printer move
         (lambda (move out)
           (format out
@@ -985,6 +986,18 @@
                   (move-X-wins move)
                   (move-O-wins move)
                   (move-draws move))))
+      
+      (define-record-printer move
+        (lambda (move out)
+          (format out
+                  "#,(move ~a ~a ~a ~a ~a)"
+                  #f
+                  (move-space move)
+                  (move-X-wins move)
+                  (move-O-wins move)
+                  (move-draws move))))
+      
+      (define-reader-ctor 'move make-move)
       
       ;;; Simple plumb without update
       (define (plumb board)
@@ -1014,6 +1027,12 @@
                        (move-draws-set! move (+ 1 (move-draws move)))))
                 (ascend (move-parent move))))))
       
+      ;;; We should be able to flatten this considerably, since the
+      ;;; game-state is history-agnostic (context-free); not to mention
+      ;;; rotation.
+      ;;;
+      ;;; Can we flatten this by hashing the game state and updating it as
+      ;;; though it were a tree (by e.g. mapping parents to hashes as well)?
       (define (plumb move board)
         ;; (display-board board)
         (let ((outcome (outcome board)))
@@ -1036,13 +1055,25 @@
                        empty-spaces))))))
       
       #;
+      (define (make-deterministic-player)
+        (lambda (board)
+          ))
+      
+      
       (let ((board (board X ε ε
                           O ε ε
                           O ε X)))
-        (debug (plumb #f board)))
+        (plumb #f board))
       
+      #;
       (let ((board (make-empty-board)))
-        (debug (plumb #f board)))
+        (with-output-to-file
+            "tic-tac-toe-game-tree.scm"
+          (lambda () (write (plumb #f board)))))
+      
+      (time (with-input-from-file
+                "tic-tac-toe-game-tree.scm"
+              read))
       
     #+END_SRC
 
@@ -1058,3 +1089,10 @@
 
     Can we implement the game tree as some kind of priority queue? It
     will, nevertheless, be a tree of queues.
+
+    This is an interesting question, actually: is wins, draws, losses
+    the correct order?
+
+    The deterministic player, by the way, is going to have to keep
+    track of the game history; or plumb from the current board. We can
+    also prune an initial game tree with the current move.
