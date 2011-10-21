@@ -566,11 +566,15 @@
     Meh; maybe we can implement the [[wikipedia-strategy][X/O-agnostic heuristics]].
 
     #+BEGIN_SRC scheme :tangle tic-tac-toe.scm
+      ;;;; Tic-tac-toe with heuristic player
+      
       (use debug
            vector-lib
            srfi-1
            srfi-11
            srfi-26)
+      
+      ;;;; General tic-tac-toe definitions
       
       (define n (make-parameter 3))
       
@@ -639,6 +643,8 @@
          ((mark) (= ε mark))
          ((board space) (empty? (board-ref board space)))))
       
+      ;;;; Board mechanics
+      
       (define make-board make-vector)
       
       (define board vector)
@@ -670,6 +676,7 @@
       
       ;;; Functional variant of Knuth shuffle: partitions the cards around a
       ;;; random pivot, takes the first card of the right-partition, repeat.
+      
       (define shuffle
         (case-lambda
          ((deck) (shuffle '() deck))
@@ -701,6 +708,8 @@
                 (cons tuplet accumulatum))
               nil
               (tuplets)))
+      
+      ;;;; Play mechanics
       
       (define (empty-spaces board)
         (vector-fold (lambda (space empty-spaces mark)
@@ -776,7 +785,9 @@
          board))
       
       (define (X-win? outcome) (X? outcome))
+      
       (define (O-win? outcome) (O? outcome))
+      
       (define (draw? outcome) (empty? outcome))
       
       (define (outcome board)
@@ -784,6 +795,8 @@
               ((win? O? board) O)
               ((null? (empty-spaces board)) ε)
               (else #f)))
+      
+      ;;;; Player mechanics
       
       (define (make-random-player player? player opponent? opponent)
         (lambda (board)
@@ -815,17 +828,25 @@
                       (random-ref losing-spaces)))
                 (random-ref my-winning-spaces)))))
       
-      ;;; This shit probably has to go.
-      (define make-default-player
-        (make-parameter make-heuristic-player))
+      (define (make-heuristic-X-player)
+        (make-heuristic-player X? X O? O))
+      
+      (define (make-heuristic-O-player)
+        (make-heuristic-player X? X O? O))
+      
+      (define make-default-X-player
+        (make-parameter make-heuristic-X-player))
+      
+      (define make-default-O-player
+        (make-parameter make-heuristic-O-player))
       
       (define play
         (case-lambda
          (()
           (play (make-empty-board)))
          ((board)
-          (play ((make-default-player) X? X O? O)
-                ((make-default-player) O? O X? X)
+          (play ((make-default-X-player))
+                ((make-default-O-player))
                 board))
          ((X-player O-player board)
           (play 0 X-player O-player board))
@@ -842,8 +863,7 @@
                   (play (+ move 1)
                         X-player
                         O-player
-                        board)))))))
-      
+                        board)))))))      
     #+END_SRC
 
     #+BEGIN_SRC scheme :tangle test-tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
@@ -1164,13 +1184,54 @@
                                           possible-min-losses
                                           min-losses))
                                     (cons -1 (make-move #f 0 +Inf +Inf 0))
-                                    possible-outcomes)))
+                                    possible-outcomes))
+                  (max-win-ratio (fold (lambda (win-ratio max-win-ratio)
+                                         (if (> (cdr win-ratio)
+                                                (cdr max-win-ratio))
+                                             win-ratio
+                                             max-win-ratio))
+                                       (cons -1 0)
+                                       (map (lambda (possible-outcome)
+                                              (cons (car possible-outcome)
+                                                    (let ((denominator
+                                                           (+ (move-opponent-wins (cdr possible-outcome))
+                                                              (move-player-wins (cdr possible-outcome))
+                                                              (move-draws (cdr possible-outcome)))))
+                                                      (if (zero? denominator)
+                                                          +Inf
+                                                          (/ (move-player-wins (cdr possible-outcome))
+                                                             denominator)))))
+                                            possible-outcomes))))
               (debug possible-outcomes
+                     ;; This is an alternative, not taking draws into
+                     ;; consideration.
                      (map (lambda (possible-outcome)
-                            (cons (car possible-outcome)
-                                  (- (move-player-wins (cdr possible-outcome))
-                                     (move-opponent-wins (cdr possible-outcome)))))
+                            (cons* (car possible-outcome)
+                                   (let ((denominator
+                                          (+ (move-opponent-wins (cdr possible-outcome))
+                                             (move-player-wins (cdr possible-outcome))
+                                             (move-draws (cdr possible-outcome)))))
+                                     (if (zero? denominator)
+                                         +Inf
+                                         (/ (move-player-wins (cdr possible-outcome))
+                                            denominator)))
+                                   (let ((denominator
+                                          (+ (move-opponent-wins (cdr possible-outcome))
+                                             (move-player-wins (cdr possible-outcome))
+                                             (move-draws (cdr possible-outcome)))))
+                                     (if (zero? denominator)
+                                         +Inf
+                                         (/ (move-opponent-wins (cdr possible-outcome))
+                                            denominator)))
+                                   (let ((denominator
+                                          (+ (move-opponent-wins (cdr possible-outcome))
+                                             (move-player-wins (cdr possible-outcome)))))
+                                     (if (zero? denominator)
+                                         +Inf
+                                         (/ (move-player-wins (cdr possible-outcome))
+                                            denominator)))))
                           possible-outcomes)
+                     max-win-ratio
                      max-wins
                      max-draws
                      min-losses)
@@ -1178,24 +1239,43 @@
                   (if (zero? (move-draws (cdr max-draws)))
                       (car min-losses)
                       (car max-draws))
-                  (car max-wins))))))
+                  #;(car max-wins)
+                  (car max-win-ratio))
+              (car min-losses)))))
       
-      (let* ((game-hash (alist->hash-table
+      (define game-hash
+        (make-parameter (alist->hash-table
                          (with-input-from-file
                              "tic-tac-toe-hash-table.scm"
-                           read)))
-             (deterministic-player (make-deterministic-player game-hash
-                                                              X?
-                                                              move-X-wins
-                                                              X
-                                                              O?
-                                                              move-O-wins
-                                                              O)))
-        (debug
-         (play 
-               deterministic-player
-               (make-heuristic-player O? O X? X)
-               (make-empty-board))))
+                           read))))
+      
+      (define (make-deterministic-X-player)
+        (make-deterministic-player (game-hash)
+                                   X?
+                                   move-X-wins
+                                   X
+                                   O?
+                                   move-O-wins
+                                   O))
+      
+      (define (make-deterministic-O-player)
+        (make-deterministic-player (game-hash)
+                                   O?
+                                   move-O-wins
+                                   O
+                                   X?
+                                   move-X-wins
+                                   X))
+      
+      (debug
+       (play 
+        (make-deterministic-X-player)
+        (make-heuristic-O-player)
+        (make-empty-board))
+       (play 
+        (make-heuristic-X-player)
+        (make-deterministic-O-player)
+        (make-empty-board)))
       
     #+END_SRC
 
@@ -1282,3 +1362,161 @@
     Yeah, naïve minimax is worthless for tic-tac-toe; you have to rely
     on [[http://www.codeproject.com/KB/game/TicTacToeByMinMax.aspx][heuristics]]. Maybe we can repurpose our
     win-fork-center-corner-side heuristics for minimax.
+
+    On using the [[http://stackoverflow.com/questions/1869096/tictactoe-ai-making-incorrect-decisions/1869181#1869181][number of winning or losing boards]]:
+
+    #+BEGIN_QUOTE
+    When counting the number of possible winning or losing boards in a
+    subtree, you are essentially assuming that each player will always
+    make a random move. As you noted, this will not be very effective
+    if you play against a smart player. The scheme I outlined above
+    instead assumes that the opponent always makes a perfect move,
+    trying to win.
+    #+END_QUOTE
+
+    The minimax tree assumes the opponent decides perfectly.
+
+    Mark Chu-Carroll did a [[http://scienceblogs.com/goodmath/2008/07/solving_tictactoe_game_tree_ba.php][piece on tic-tac-toe]], too:
+
+    #+BEGIN_QUOTE
+    First, you can prune the tree: any strategy that doesn't include a
+    potential path for you to win, you can just eliminate from
+    consideration: it has a utility of 0. For other moves, you look at
+    the potential paths: if move A leads into a subtree where 72% of
+    the paths lead to a leaf in which you win, then the utility of A
+    is 0.72. Each turn, the best strategy is the one with the highest
+    utility; moves with equal utility are equivalent.
+    #+END_QUOTE
+
+    Interesting; with some $n$, is it possible to convert the
+    . . . no: we can just do ratio of wins to losses. It turns out
+    that you don't really need heuristics unless you're approximating
+    the game-tree, /n'est-ce pas?/
+
+    #+BEGIN_QUOTE
+    So we to compute approximate utilities. We can compute approximate
+    utility values using a variety of techniques, including
+    heuristics, prunings, board valuations, and partial trees.
+    #+END_QUOTE
+
+    (Gradient descent, by the way, is one of the ``aha!'' things that
+    seems obvious after the fact.)
+
+    What about [[http://scienceblogs.com/goodmath/2008/07/solving_tictactoe_game_tree_ba.php#comment-1022917][this comment]]?
+
+    #+BEGIN_QUOTE
+    ``If move A leads into a subtree where 72% of the paths lead to a
+    leaf in which you win, then the utility of A is 0.72.''
+
+    No ... if any of the moves available to the next player are a win
+    for him, then that move is a loss for you. If all of the moves
+    available to the next player are a loss for that player, then it's
+    a win for you. TicTackToe is uninteresting because there's no
+    percentage utility about it.
+    #+END_QUOTE
+
+    [[http://scienceblogs.com/goodmath/2008/07/solving_tictactoe_game_tree_ba.php#comment-1023262][This]] is kind of funny:
+
+    #+BEGIN_QUOTE
+    If you were really building a representation of a game tree, you
+    wouldn't implement it that way - but no one would really implement
+    tic-tac-toe as a game tree. If you study the TTT game tree and its
+    utility function, you can collapse it down to virtually
+    nothing. The full tree is interesting as an understandable
+    abstraction, not as a practical implementation.
+    #+END_QUOTE
+
+    We did implement it as a game tree, then as a hash; but we're not
+    taking symmetries into account and maybe we should. It could just
+    be a matter of normalizing the board before we hash it or perform
+    lookups.
+
+    The rotations of the board (=012 345 678=), by the way:
+
+    #+BEGIN_EXAMPLE
+      258 147 036
+      876 543 210
+      631 741 852
+    #+END_EXAMPLE
+
+    It seems like if you imagine a tenth square exists, and take
+    $\mod{3}$; you get the rotations. The $(n^2+1)^{\text{th}}$ square
+    also becomes a sentinel to stop rotating.
+
+    The symmetries seem to happen by reversing triplets and swapping
+    rows, respectively:
+
+    #+BEGIN_EXAMPLE
+      210 543 876
+      678 345 012
+    #+END_EXAMPLE
+
+    Naïvely, you could test the rotations and symmetries against the
+    hash tree until you found a match; otherwise, add the hash. Lookup
+    is similarly expensive, though.
+
+    We could hash each board as a 17-bit integer (i.e. [[http://scienceblogs.com/goodmath/2008/07/solving_tictactoe_game_tree_ba.php#comment-1021447][32 bits]])
+    instead of a string, by the way: bits e.g. 0 through 8 are the X
+    positions; 9 through 17, O.
+
+    The win ratio does yield different results than the max analysis;
+    give it a shot?
+
+    Just to confirm [[http://stackoverflow.com/questions/6575464/min-max-tic-tac-toe/6575566#6575566][out intuition]]:
+
+    #+BEGIN_QUOTE
+    The real problem with this algorithm (and where you may be getting
+    results that you aren't expecting) is when all sub-trees result in
+    possible losses. At that point, you will need to use a heuristic
+    to get any better information on which move you should take. You
+    will need something better than simply {-1, 0, 1}, because some
+    moves could allow you to win, but you'd block them out because you
+    could also lose.    
+    #+END_QUOTE
+
+    [[http://stackoverflow.com/questions/6575464/min-max-tic-tac-toe/6581832#6581832][Also]]:
+
+    #+BEGIN_QUOTE
+    This behavior is quite easy to implement in min/max using a decay
+    for each recursion. I.e. whenever you return something from a
+    recursive call multiply the result by 0.9 or something like
+    this. This will lead to higher scores for longer negative paths
+    and smaller scores for longer positive paths.
+    #+END_QUOTE
+
+    If we do ratio of wins to wins, draws, losses; and wins are zero,
+    we can't distinguish states anymore. At that point: ratio of draws
+    to draws, losses; after which: minimize losses?
+
+    This guy successfully [[http://www.codeproject.com/KB/game/TicTacToeByMinMax.aspx][applied a heuristic to minimax]], by the way:
+
+    #+BEGIN_QUOTE
+    - For each row, if there are both X and O, then the score for the
+      row is 0.
+    - If the whole row is empty, then the score is 1.
+    - If there is only one X, then the score is 10.
+    - If there are two Xs, then the score is 100.
+    - If there are 3 Xs, then the score is 1000, and the winner is
+      Player X.
+    - For Player O, the score is negative.
+    - Player X tries to maximize the score.
+    - Player O tries to minimize the score.
+    - If the current turn is for Player X, then the score of Player X
+      has more advantage. I gave the advantage rate as 3.
+    #+END_QUOTE
+
+    Doesn't mention anything about forks, etc.
+
+    Let's abandon minimax, since we have a heuristic player: we'd have
+    to integrate the heuristic with minimax, anyway; at which point
+    minimax is superfluous.
+
+    Let's package tic-tac-toe as a module with tests, too; thet way
+    the dependencies can be pulled with
+    =chicken-install=.
+
+    =with-debug-level= in =debug= would be nice, too.
+
+    I'd like to take the opportunity to have the tic-tac-toe module
+    conform to Riastradh's [[http://mumble.net/~campbell/scheme/style.txt][style rules]], too.
+    
