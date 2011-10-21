@@ -1115,9 +1115,87 @@
                   "tic-tac-toe-game-tree.scm"
                 read))
       
+      #;
         (debug (time (with-input-from-file
-                   "tic-tac-toe-hash-table.scm"
-                 read)))
+                         "tic-tac-toe-hash-table.scm"
+                       read)))
+      
+      (define (make-deterministic-player game-hash
+                                         player?
+                                         move-player-wins
+                                         player
+                                         opponent?
+                                         move-opponent-wins
+                                         opponent)
+        (lambda (board)
+          (let* ((possible-moves (empty-spaces board))
+                 (possible-outcomes
+                  (map (lambda (possible-move)
+                         (let ((board (board-copy board)))
+                           (board-set! board possible-move player)
+                           (cons possible-move
+                                 (hash-table-ref game-hash (hash-board board)))))
+                       possible-moves)))
+            ;; Disadvantage of not having a tree: we have to keep track of
+            ;; the move auxiliarily; no biggy, right?
+            (let ((max-wins (fold (lambda (possible-max-wins max-wins)
+                                    (if (> (move-player-wins
+                                            (cdr possible-max-wins))
+                                           (move-player-wins
+                                            (cdr max-wins)))
+                                        possible-max-wins
+                                        max-wins))
+                                  (cons -1 (make-move #f 0 0 0 0))
+                                  possible-outcomes))
+                  (max-draws (fold (lambda (possible-max-draws max-draws)
+                                     (if (> (move-draws
+                                             (cdr possible-max-draws))
+                                            (move-draws
+                                             (cdr max-draws)))
+                                         possible-max-draws
+                                         max-draws))
+                                   (cons -1 (make-move #f 0 0 0 0))
+                                   possible-outcomes))
+                  (min-losses (fold (lambda (possible-min-losses min-losses)
+                                      (if (< (move-opponent-wins
+                                              (cdr possible-min-losses))
+                                             (move-opponent-wins
+                                              (cdr min-losses)))
+                                          possible-min-losses
+                                          min-losses))
+                                    (cons -1 (make-move #f 0 +Inf +Inf 0))
+                                    possible-outcomes)))
+              (debug possible-outcomes
+                     (map (lambda (possible-outcome)
+                            (cons (car possible-outcome)
+                                  (- (move-player-wins (cdr possible-outcome))
+                                     (move-opponent-wins (cdr possible-outcome)))))
+                          possible-outcomes)
+                     max-wins
+                     max-draws
+                     min-losses)
+              (if (zero? (move-player-wins (cdr max-wins)))
+                  (if (zero? (move-draws (cdr max-draws)))
+                      (car min-losses)
+                      (car max-draws))
+                  (car max-wins))))))
+      
+      (let* ((game-hash (alist->hash-table
+                         (with-input-from-file
+                             "tic-tac-toe-hash-table.scm"
+                           read)))
+             (deterministic-player (make-deterministic-player game-hash
+                                                              X?
+                                                              move-X-wins
+                                                              X
+                                                              O?
+                                                              move-O-wins
+                                                              O)))
+        (debug
+         (play 
+               deterministic-player
+               (make-heuristic-player O? O X? X)
+               (make-empty-board))))
       
     #+END_SRC
 
@@ -1140,3 +1218,67 @@
     The deterministic player, by the way, is going to have to keep
     track of the game history; or plumb from the current board. We can
     also prune an initial game tree with the current move.
+
+    Beware: it doesn't look like opposite corner is working, by the
+    way; nor fork, for that matter.
+
+    Here's an [[http://en.wikipedia.org/wiki/Game_tree][interesting solution]] to the rotation/reflection problem, by the
+    way: reduce before hashing!
+
+    State of the union: heuristic doesn't seem to recognize e.g. forks
+    or opposite corners; deterministic doesn't play well.
+
+    For deterministic, let's try [[http://en.wikipedia.org/wiki/Minimax][minimax]]; we may need to revise our
+    position evaluation function, even going back to
+    trees. Interestingly, we can do a basic win/loss calculus and $+1$
+    and $-1$ (how to deal with draws: $0$, $0.5$?);
+
+    See [[http://en.wikipedia.org/wiki/Minimax#Minimax_algorithm_with_alternate_moves][minimax with alternate moves]] and [[http://en.wikipedia.org/wiki/Alpha-beta_pruning][alpha-beta pruning]]; also,
+    [[http://en.wikipedia.org/wiki/Variation_(game_tree)#Principal_variation][principal variation]]. [[http://en.wikipedia.org/wiki/Negamax][Negamax]] for two-player, zero-sum games; by
+    the way.
+
+    [[http://ai-depot.com/articles/minimax-explained/][This]] is interesting:
+
+    #+BEGIN_QUOTE
+    The nodes that belong to the MAX player receive the maximun value
+    of it’s [sic] children. The nodes for the MIN player will select
+    the minimun value of it’s [sic] children.
+    #+END_QUOTE
+
+    See also [[http://www.stanford.edu/~msirota/soco/minimax.html][this]]:
+
+    #+BEGIN_QUOTE
+    For a win-or-lose game like chess or tic-tac-toe, there are only
+    three possible values-win, lose, or draw (often assigned numeric
+    values of 1, -1, and 0 respectively).
+    #+END_QUOTE
+
+    Draws are indeed ignored; continuing:
+
+    #+BEGIN_QUOTE
+    Ultimately, each option that the computer currently has available
+    can be a assigned a value, as if it were a terminal state, and the
+    computer simply picks the highest value and takes that action.
+    #+END_QUOTE
+
+    Does the following imply that the heuristic approach is better?
+
+    #+BEGIN_QUOTE
+    As veteran tic-tac-toe players know, there is no opening move
+    which guarantees victory; so, a computer running a minimax
+    algorithm without any sort of enhancements will discover that, if
+    both it and its opponent play optimally, the game will end in a
+    draw no matter where it starts, and thus have no clue as to which
+    opening play is the "best."
+    #+END_QUOTE
+
+    A hybrid heuristic-minimax approach:
+
+    #+BEGIN_QUOTE
+    However, minimax is still useful when employed with heuristics
+    which approximate possible outcomes from a certain point.
+    #+END_QUOTE
+
+    Yeah, naïve minimax is worthless for tic-tac-toe; you have to rely
+    on [[http://www.codeproject.com/KB/game/TicTacToeByMinMax.aspx][heuristics]]. Maybe we can repurpose our
+    win-fork-center-corner-side heuristics for minimax.
