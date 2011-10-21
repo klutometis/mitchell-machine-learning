@@ -1520,3 +1520,22 @@
     I'd like to take the opportunity to have the tic-tac-toe module
     conform to Riastradh's [[http://mumble.net/~campbell/scheme/style.txt][style rules]], too.
     
+    #+BEGIN_QUOTE
+    One simple approach has been found to be surprisingly successful:
+    assign the training value of $V_{\text{train}}(b)$ for any
+    intermediate board state $b$ to be $\hat{V}(\text{Successor}(b))$,
+    where $Successor(b)$ denotes the next board state following $b$
+    for which it is again the program's turn to move:
+
+    #+BEGIN_LATEX
+      \begin{equation*}
+        V_{train}(b) \gets \hat{V}(Successor(b))
+      \end{equation*}
+    #+END_LATEX
+    #+END_QUOTE
+
+    Not utterly different from minimax, then, in the sense that we're
+    going to have to descend to the leave and propagate up; aren't we?
+
+    (If features /qua/ board-position is insufficient, by the way, we
+    might have to come up with features based on our heuristics.)
