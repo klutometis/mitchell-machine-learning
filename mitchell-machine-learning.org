@@ -1539,3 +1539,67 @@
 
     (If features /qua/ board-position is insufficient, by the way, we
     might have to come up with features based on our heuristics.)
+
+    Problem even says, by the way, to "use a fixed evaluation function
+    you create by hand;" which doesn't rule out minimax, of course.
+
+    We'll rate a given board on the basis of: wins, losses, forks,
+    opponent forks, center, corners, sides.
+
+    #+BEGIN_QUOTE
+    We will find it useful to reduce the problem of improving
+    performance $P$ at task $T$ to the problem of learning some
+    particular /target function/ such as /ChooseMove/.
+
+    An alternative target function, is an evaluation function that
+    assigns a numerical score to any given board state.
+
+    If the system can successfully learn such a target function $V$,
+    then it can easily use it to select the best move from any current
+    board position. This can be accomplished by generating the
+    successor board state produced by every legal move, then using $V$
+    to choose the best successor state and therefore the best legal
+    move.
+
+    4. if $b$ is not a final state in the game, then $V(b) =
+       V(b^{\prime})$, where $b^{\prime}$ is the best final board
+       state that cane be achieved starting from $b$ and playing
+       optimally until the end of the game (assuming the opponent
+       plays optimally as well).
+    #+END_QUOTE
+
+    This smacks of minimax; what about tic-tac-toe, where everything
+    leads to draw? ``Nonoperational'' definition, anyway.
+
+    #+BEGIN_QUOTE
+    We could allow the program to represent $\hat{V}$ using a large
+    table with a distinct entry specifying the value for each distinct
+    board state. Or we could allow it to represent $\hat{V}$ using a
+    collection of rules that match against features of the board
+    state, or a quadratic polynomial function of predefined board
+    features, or an artifical neural network.
+    #+END_QUOTE
+
+    #+BEGIN_QUOTE
+    To learn $\hat{V}$, we require a set of training examples, each
+    describing a specific board state $b$ and the training value
+    $V_{train}(b)$ for $b$. Each training example is an ordered pair
+    of the form $\left<b, V_{train}(b)\right>$.
+    #+END_QUOTE
+
+    #+BEGIN_QUOTE
+    Assign the training value of $V_{train}(b)$ for any intermediate
+    board state $b$ to be $\hat{V}(Successor(b))$, where $\hat{V}$ is
+    the learner's current approximation to $V$ and where
+    $Successor(b)$ denotes the next board state following $b$ for
+    which it is again the program's turn to move:
+    #+BEGIN_LATEX
+      \begin{equation*}
+        V_{train}(b) \gets \hat{V}(Successor(b))
+      \end{equation*}
+    #+END_LATEX
+    Intuitively, we can see this will make sense if $\hat{V}$ tends to
+    be more accurate for board states closer to the game's end.
+    #+END_QUOTE
+
+    
