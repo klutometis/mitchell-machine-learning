@@ -1629,15 +1629,37 @@
       ;;; to an evaluative lambda (evaluative in the sense that evaluates
       ;;; the board and returns some scalar corresponding to the feature).
       
+      (define (fold-marks cons nil board)
+        (fold (lambda (tuplet accumulatum)
+                (cons (map (cute board-ref board <>) tuplet)
+                      accumulatum))
+              nil
+              (tuplets)))
+      
       (define (wins player? board)
-        (fold-tuplet
-         (lambda (tuplet wins)
-           (+ (if (every player? (map (cute board-ref board <>) tuplet))
+        (fold-marks
+         (lambda (marks wins)
+           (+ (if (every player? marks)
                   1
                   0)
               wins))
          0
          board))
+      
+      (define (pairs player? board)
+        (fold-marks
+         (lambda (marks pairs)
+           ;; This does not scale to n <> 3; better iterate.
+           (+ (if (and (= 1 (length (filter (complement player?) marks)))
+                       (player? (cadr marks)))
+                  1
+                  0)
+              pairs))
+         0
+         board))
+      
+      (define (center player? board)
+        (if (player? (board-ref board (center-space board))) 1 0))
       
       (define constant (constantly 1))
       
@@ -1764,7 +1786,11 @@
       
       (let ((V-hat `((1 . ,constant)
                      (1 . ,(cut wins X? <>))
-                     (1 . ,(cut wins O? <>)))))
+                     (1 . ,(cut wins O? <>))
+                     (1 . ,(cut pairs X? <>))
+                     (1 . ,(cut pairs O? <>))
+                     (1 . ,(cut center X? <>))
+                     (1 . ,(cut center O? <>)))))
         (let-values
             (((history outcome)
               (perform V-hat
@@ -1772,11 +1798,11 @@
                        (make-empty-board))))
           (let ((V-train (critique history outcome)))
             (debug (generalize V-train V-hat)))
-          #;(display-board (car history))
-          #;
-          (debug history
-                 outcome
-                 (critique history outcome))))
+          (display-board (car history))
+          ;; (debug history
+          ;;        outcome
+          ;;        (critique history outcome))
+          ))
       
     #+END_SRC
 
@@ -1822,3 +1848,9 @@
     two-pair and two-pair with a common origin. Maybe =fold-tuplet=
     should indeed do the =board-ref= mapping (on analogy with
     =vector-fold=).
+
+    (Whoops: I've been saying ``tuplet'' when I meant ``tuple;''
+    musical error.)
+    
+    Let's plot learning-player vs. random- and heuristic-player, by
+    the way.
