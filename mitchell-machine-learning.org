@@ -568,13 +568,14 @@
     #+BEGIN_SRC scheme :tangle tic-tac-toe.scm
       ;;;; Tic-tac-toe with heuristic player
       
+      (import srfi-1)
+      
       (use debug
            vector-lib
-           srfi-1
            srfi-11
            srfi-26)
       
-      ;;;; General tic-tac-toe definitions
+      General tic-tac-toe definitions
       
       (define n (make-parameter 3))
       
@@ -1620,9 +1621,9 @@
     weights?
 
     #+BEGIN_SRC scheme :tangle learn-tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
-      (use srfi-95)
-      
       (include "tic-tac-toe.scm")
+      
+      (use srfi-95)
       
       ;;; Each variable corresponds to a feature; each feature corresponds
       ;;; to an evaluative lambda (evaluative in the sense that evaluates
@@ -1652,31 +1653,7 @@
       
       ;;; More specifically, it implies that any board state corresponding
       ;;; to an opponent's move is the same as the one that preceded it
-      ;;; (where it is the player's turn). Due to the current mechanics of
-      ;;; =play=, I don't think the learning player will see the final board
-      ;;; position; since the play-broker shuts it down. We can change that.
-      
-      ;;; Let's output our solutions. Can we have a =fold-game=, by the way,
-      ;;; so I don't have to rely on mutation to keep track of state?
-      ;;; =fold-game= is a =play= with an explicit accumulator. It might
-      ;;; need to return both the accumulation and the outcome.
-      
-      ;;; If board were first, unlimited number of players.
-      (define (fold-game move board X-player X-cons X-nil O-player O-cons O-nil)
-        (let ((outcome (outcome board)))
-          (if outcome
-              (values X-nil O-nil outcome)
-              (if (even? move)
-                  (let ((next-move (X-player board)))
-                    (board-set! board next-move token)
-                    (fold-game (+ 1 move)
-                               X-player
-                               X-cons
-                               ))))))
-      
-      ;;; Scratch =fold-game= for the time being; we have to keep track of
-      ;;; state and move for each player: messy and unnecessary. Let's
-      ;;; mutate.
+      ;;; (where it is the player's turn).
       
       (define (map-possible-moves morphism token board)
         (let iter ((empty-spaces (empty-spaces board))
@@ -1718,13 +1695,19 @@
                           O-player
                           board))))))))
       
+      (define (apply-V-hat V-hat board)
+        (fold + 0 (map (lambda (hypothesis-feature)
+                         (* (hypothesis hypothesis-feature)
+                            ((feature hypothesis-feature) board)))
+                       V-hat)))
+      
       ;;; Generalize this later to X or O.
       (define (perform V-hat opponent problem)
         (play (lambda (board)
                 (let* ((scores->move-boards
                         (map-possible-moves
                          (lambda (move board)
-                           (cons* (V-hat board) move board))
+                           (cons* (apply-V-hat V-hat board) move board))
                          X
                          board))
                        ;; Beware the corner case where we have no moves;
@@ -1743,20 +1726,53 @@
               problem))
       
       (define (critique history outcome)
-        (let ((v-train (cond ((X-win? outcome) 100)
+        (let ((V-train (cond ((X-win? outcome) 100)
                              ((O-win? outcome) -100)
                              (else 0))))
-          (map (cute cons <> v-train) history)))
+          (map (cute cons <> V-train) history)))
       
-      (let-values
-          (((history outcome)
-            (perform (lambda (board) 1)
-                     (make-heuristic-O-player)
-                     (make-empty-board))))
-        (display-board (car history))
-        (debug history
-               outcome
-               (critique history outcome)))
+      (define eta (make-parameter 0.1))
+      
+      (define state car)
+      
+      (define score cdr)
+      
+      (define hypothesis car)
+      
+      (define feature cdr)
+      
+      (define (generalize V-trains V-hat)
+        (let iter ((V-trains V-trains)
+                   (V-hat V-hat))
+          (if (null? V-trains)
+              V-hat
+              (let ((V-train (car V-trains)))
+                (let ((state (state V-train))
+                      (training-score (score V-train)))
+                  (let* ((estimated-score (apply-V-hat V-hat state))
+                         (error (- training-score estimated-score)))
+                    (iter (cdr V-trains)
+                          (map (lambda (hypothesis-feature)
+                                 (cons (+ (hypothesis hypothesis-feature)
+                                          (* (eta) error ((feature hypothesis-feature) state)))
+                                       (feature hypothesis-feature)))
+                               V-hat))))))))
+      
+      (let ((V-hat `((1 . ,constant)
+                     (1 . ,(cut wins X? <>))
+                     (1 . ,(cut wins O? <>)))))
+        (let-values
+            (((history outcome)
+              (perform V-hat
+                       (make-heuristic-O-player)
+                       (make-empty-board))))
+          (let ((V-train (critique history outcome)))
+            (debug (generalize V-train V-hat)))
+          #;(display-board (car history))
+          #;
+          (debug history
+                 outcome
+                 (critique history outcome))))
       
     #+END_SRC
 
