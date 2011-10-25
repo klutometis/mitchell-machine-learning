@@ -1816,3 +1816,9 @@
     finally relevant; unexpressed features will not weigh in. The
     Critic, furthermore, is responsible for the $\text{win} \to +100$,
     $\text{loss} \to -100$, $\text{draw} \to 0$ heuristics.
+
+    A fork is two pairs with a common square; does it count as a fork,
+    for instance, if you can't actually execute? Maybe we can count
+    two-pair and two-pair with a common origin. Maybe =fold-tuplet=
+    should indeed do the =board-ref= mapping (on analogy with
+    =vector-fold=).
