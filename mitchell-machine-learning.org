@@ -1632,7 +1632,10 @@
       (define (wins player? board)
         (fold-tuplet
          (lambda (tuplet wins)
-           (+ (if (every player? tuplet) 1 0) wins))
+           (+ (if (every player? (map (cute board-ref board <>) tuplet))
+                  1
+                  0)
+              wins))
          0
          board))
       
@@ -1753,6 +1756,7 @@
                          (error (- training-score estimated-score)))
                     (iter (cdr V-trains)
                           (map (lambda (hypothesis-feature)
+                                 (debug ((feature hypothesis-feature) state))
                                  (cons (+ (hypothesis hypothesis-feature)
                                           (* (eta) error ((feature hypothesis-feature) state)))
                                        (feature hypothesis-feature)))
