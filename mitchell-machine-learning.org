@@ -1742,13 +1742,21 @@
               opponent
               problem))
       
+      (define (critique history outcome)
+        (let ((v-train (cond ((X-win? outcome) 100)
+                             ((O-win? outcome) -100)
+                             (else 0))))
+          (map (cute cons <> v-train) history)))
+      
       (let-values
           (((history outcome)
             (perform (lambda (board) 1)
                      (make-heuristic-O-player)
                      (make-empty-board))))
         (display-board (car history))
-        (debug history outcome))
+        (debug history
+               outcome
+               (critique history outcome)))
       
     #+END_SRC
 
@@ -1786,5 +1794,5 @@
 
     Ah: when it comes to adjusting the weights, the board-state is
     finally relevant; unexpressed features will not weigh in. The
-    Critic, furthermore, is responsible for the win \to +100, loss \to
-    -100, draw \to 0 heuristics.
+    Critic, furthermore, is responsible for the $\text{win} \to +100$,
+    $\text{loss} \to -100$, $\text{draw} \to 0$ heuristics.
