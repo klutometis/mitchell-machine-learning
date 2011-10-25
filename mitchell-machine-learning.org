@@ -1605,6 +1605,20 @@
     be more accurate for board states closer to the game's end.
     #+END_QUOTE
 
+    Performance system takes $\hat{V}$, evaluates the possible boards,
+    selects the best one; repeat. Produces a game history. The critic
+    takes the trace, produces $\left<b, V_{train}(b)\right>$. The
+    generalizer takes the training examples and the hypothesis;
+    updates the hypothesis accordingly. The experiment generator takes
+    the current hypothesis and outputs a new problem for the
+    performance system to explore. Let's say: blank board
+    vs. heuristic player.
+
+    $V_{train}$ from $\hat{V}(Successor(b))$ is still a little fuzzy:
+    do we trace to an endpoint, and propagate up? And what's the
+    initial state of the algorithm: some guess; or ones for all the
+    weights?
+
     #+BEGIN_SRC scheme :tangle learn-tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
       (use srfi-95)
       
@@ -1769,3 +1783,8 @@
 
     What's the point of having the game trace: what do we do with the
     $<b, V_{train}(b)>$ pairs?
+
+    Ah: when it comes to adjusting the weights, the board-state is
+    finally relevant; unexpressed features will not weigh in. The
+    Critic, furthermore, is responsible for the win \to +100, loss \to
+    -100, draw \to 0 heuristics.
