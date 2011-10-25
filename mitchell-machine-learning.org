@@ -840,6 +840,8 @@
       (define make-default-O-player
         (make-parameter make-heuristic-O-player))
       
+      ;;; Can we get rid of =move= if we simply cycle through X and O;
+      ;;; thence recurse?
       (define play
         (case-lambda
          (()
@@ -863,7 +865,8 @@
                   (play (+ move 1)
                         X-player
                         O-player
-                        board)))))))      
+                        board)))))))
+      
     #+END_SRC
 
     #+BEGIN_SRC scheme :tangle test-tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
@@ -1602,4 +1605,167 @@
     be more accurate for board states closer to the game's end.
     #+END_QUOTE
 
-    
+    #+BEGIN_SRC scheme :tangle learn-tic-tac-toe.scm :shebang #!/usr/bin/env chicken-scheme
+      (use srfi-95)
+      
+      (include "tic-tac-toe.scm")
+      
+      ;;; Each variable corresponds to a feature; each feature corresponds
+      ;;; to an evaluative lambda (evaluative in the sense that evaluates
+      ;;; the board and returns some scalar corresponding to the feature).
+      
+      (define (wins player? board)
+        (fold-tuplet
+         (lambda (tuplet wins)
+           (+ (if (every player? tuplet) 1 0) wins))
+         0
+         board))
+      
+      (define constant (constantly 1))
+      
+      ;;; Hat-V corresponds to a list of weight-(hypothesis)--feature pairs;
+      ;;; order of the weight-feature pairs doesn't matter, I think. The
+      ;;; hypothesis-feature pairs are collectively the target function.
+      
+      ;;; Perform takes a board and target-function; and returns a series of
+      ;;; moves. Do the moves contain opponent moves, or merely mine? This
+      ;;; implies merely mine: "This approach is to assign the training
+      ;;; value of $V_{train}(b)$ for any intermediate board state $b$ to be
+      ;;; $\hat{V}(Successor(b))$, where $\hat{V}$ is the learner's current
+      ;;; approximation to $V$ and where $Successor(b)$ denotes the next
+      ;;; board state following $b$ for which it is again the program's turn
+      ;;; to move."
+      
+      ;;; More specifically, it implies that any board state corresponding
+      ;;; to an opponent's move is the same as the one that preceded it
+      ;;; (where it is the player's turn). Due to the current mechanics of
+      ;;; =play=, I don't think the learning player will see the final board
+      ;;; position; since the play-broker shuts it down. We can change that.
+      
+      ;;; Let's output our solutions. Can we have a =fold-game=, by the way,
+      ;;; so I don't have to rely on mutation to keep track of state?
+      ;;; =fold-game= is a =play= with an explicit accumulator. It might
+      ;;; need to return both the accumulation and the outcome.
+      
+      ;;; If board were first, unlimited number of players.
+      (define (fold-game move board X-player X-cons X-nil O-player O-cons O-nil)
+        (let ((outcome (outcome board)))
+          (if outcome
+              (values X-nil O-nil outcome)
+              (if (even? move)
+                  (let ((next-move (X-player board)))
+                    (board-set! board next-move token)
+                    (fold-game (+ 1 move)
+                               X-player
+                               X-cons
+                               ))))))
+      
+      ;;; Scratch =fold-game= for the time being; we have to keep track of
+      ;;; state and move for each player: messy and unnecessary. Let's
+      ;;; mutate.
+      
+      (define (map-possible-moves morphism token board)
+        (let iter ((empty-spaces (empty-spaces board))
+                   (domain '()))
+          (if (null? empty-spaces)
+              domain
+              (iter (cdr empty-spaces)
+                    (let ((board (board-copy board))
+                          (move (car empty-spaces)))
+                      (board-set! board move token)
+                      (cons (morphism move board) domain))))))
+      
+      (define play
+        (case-lambda
+         (()
+          (play (make-empty-board)))
+         ((board)
+          (play ((make-default-X-player))
+                ((make-default-O-player))
+                board))
+         ((X-player O-player board)
+          (play 0 (list board) X-player O-player board))
+         ((move history X-player O-player board)
+          ;; (debug move)
+          ;; (display-board board)
+          (let ((outcome (outcome board)))
+            (if outcome
+                (values history outcome)
+                (let-values (((token player)
+                              (if (even? move)
+                                  (values X X-player)
+                                  (values O O-player))))
+                  (let ((next-move (player board))
+                        (board (board-copy board)))
+                    (board-set! board next-move token)
+                    (play (+ move 1)
+                          (cons board history)
+                          X-player
+                          O-player
+                          board))))))))
+      
+      ;;; Generalize this later to X or O.
+      (define (perform V-hat opponent problem)
+        (play (lambda (board)
+                (let* ((scores->move-boards
+                        (map-possible-moves
+                         (lambda (move board)
+                           (cons* (V-hat board) move board))
+                         X
+                         board))
+                       ;; Beware the corner case where we have no moves;
+                       ;; we'll encounter this, too, if Mitchell is to be
+                       ;; believed, since e.g. <x_1 = 3, ...> -> +100.
+                       (max-score (car (car (sort scores->move-boards < car))))
+                       (max-move-boards (filter (lambda (score->move-board)
+                                                  #;
+                                                  (debug score->move-board
+                                                         max-score)
+                                                  (= max-score (car score->move-board)))
+                                                scores->move-boards))
+                       (max-move-board (random-ref max-move-boards)))
+                  (cadr max-move-board)))
+              opponent
+              problem))
+      
+      (let-values
+          (((history outcome)
+            (perform (lambda (board) 1)
+                     (make-heuristic-O-player)
+                     (make-empty-board))))
+        (display-board (car history))
+        (debug history outcome))
+      
+    #+END_SRC
+
+    The performer will evaluate according to: wins, losses, my forks,
+    their forks, center, corners, sides.
+
+    In addition to "subjunctive" features like =winning-spaces=,
+    =forking-spaces=, etc.; we need indicative (i.e. enumerative) ones
+    like: =wins=, =forks=, =center?=, =corners=, =sides=. They can
+    employ slightly simplified logic, since we don't care about the
+    actual spaces and we don't need to enumerate possible moves. It
+    would be nice to unify them, however, with the subjunctive
+    features; in which case, they merely employ enumeration of moves
+    and indication of features.
+
+    Or, fuck it: let's just =length= on the space-enumerative
+    features. Do we need to distinguish between I-have-the-center
+    vs. other-has-the-center? Do we need to distinguish between
+    corners and opposite corners?
+
+    Let's implement the learning system with one feature: wins; once
+    we have the mechanics down, we can implement other features.
+
+    #+BEGIN_QUOTE
+    According to our formulation of the learning problem, the only
+    training information available to our learner is whether the game
+    was eventually won or lost.
+    #+END_QUOTE
+
+    It seems like we recurse indeed to the leaves and propagate up
+    with one quantum of data: win or loss.
+
+    What's the point of having the game trace: what do we do with the
+    $<b, V_{train}(b)>$ pairs?
