@@ -1854,3 +1854,8 @@
     
     Let's plot learning-player vs. random- and heuristic-player, by
     the way.
+
+    Currently using pairs as a feature, which may or may not be
+    relevant; it will be interesting to see if ephemeral features
+    (like forks which, as opposed to convergent pairs, don't
+    necessarily exist at game end) behave.
