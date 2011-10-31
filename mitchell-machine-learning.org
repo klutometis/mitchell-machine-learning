@@ -1853,7 +1853,7 @@
       
       (let iter
           ((V-hat `(
-                    (1 . ,constant) ;
+                    ;; (1 . ,constant) ;
                     (1 . ,(cut wins X? <>))
                     (1 . ,(cut wins O? <>))
                     ;; (1 . ,(cut pairs X? <>)) ;
