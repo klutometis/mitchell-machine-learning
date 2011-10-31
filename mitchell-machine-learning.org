@@ -1800,7 +1800,7 @@
                        ;; Beware the corner case where we have no moves;
                        ;; we'll encounter this, too, if Mitchell is to be
                        ;; believed, since e.g. <x_1 = 3, ...> -> +100.
-                       (max-score (car (car (sort scores->move-boards < car))))
+                       (max-score (car (car (sort scores->move-boards > car))))
                        (max-move-boards (filter (lambda (score->move-board)
                                                   #;
                                                   (debug score->move-board
@@ -1808,6 +1808,11 @@
                                                   (= max-score (car score->move-board)))
                                                 scores->move-boards))
                        (max-move-board (random-ref max-move-boards)))
+                  #;
+                  (debug (sort scores->move-boards > car)
+                         max-score
+                         max-move-boards
+                         max-move-board)
                   (cadr max-move-board)))
               opponent
               problem))
@@ -1875,7 +1880,7 @@
            (wins 0)
            (losses 0)
            (draws 0))
-        (if (< i 1000)
+        (if (< i 10000)
             (let-values
                 (((history outcome)
                   (perform V-hat
@@ -1890,7 +1895,9 @@
                 ;;        (occupied-corners X? (car history))
                 ;;        new-V-hat)
                 (debug (delta V-hat new-V-hat)
-                       outcome)
+                       outcome
+                       ;; new-V-hat
+                       )
                 (iter
                  new-V-hat
                  (+ i 1)
