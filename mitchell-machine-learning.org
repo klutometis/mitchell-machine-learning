@@ -1631,7 +1631,7 @@
       
       (define (fold-marks cons nil board)
         (fold (lambda (tuplet accumulatum)
-                (cons (map (cute board-ref board <>) tuplet)
+                (cons (map (cut board-ref board <>) tuplet)
                       accumulatum))
               nil
               (tuplets)))
@@ -1657,6 +1657,68 @@
               pairs))
          0
          board))
+      
+      ;;; Transient
+      (define (transient-forks player? player board)
+        (length (forking-spaces player? player board)))
+      
+      ;;; `marks' is really a triplet.
+      (define (two-in-a-row? player? marks)
+        (and (= 1 (length (filter (complement player?) marks)))
+             (player? (cadr marks))))
+      
+      (define map-pairs
+        (case-lambda
+         ((transform transformanda)
+          (map-pairs transform '() transformanda))
+         ((transform transformata transformanda)
+          (if (null? transformanda)
+              transformata
+              (append
+               (map-pairs
+                transform
+                (let ((transformans (car transformanda)))
+                  (map (lambda (transformandum)
+                         (transform transformans transformandum))
+                       (cdr transformanda)))
+                (cdr transformanda))
+               transformata)))))
+      
+      (define (forks player? board)
+        (let ((pairs
+               (fold-tuplet
+                (lambda (tuplet pairs)
+                  (let* ((marks (map (cut board-ref board <>) tuplet))
+                         (spaces->marks (map cons tuplet marks)))
+                    (if (two-in-a-row? player? marks)
+                        (cons tuplet pairs)
+                        pairs)))
+                '()
+                board)))
+          (apply +
+                 (map-pairs (lambda (p1 p2)
+                              (if (pair? (lset-intersection = p1 p2)) 1 0))
+                            pairs))))
+      
+      (define (occupied-corners player? board)
+        (length (filter player? (map (cut board-ref board <>)
+                                     (corners)))))
+      
+      (define (occupied-sides player? board)
+        (length (filter player? (map (cut board-ref board <>)
+                                     (list 1 3 5 7)))))
+      
+      (define (occupied-opposite-corners player? board)
+        (let* ((corners (filter (lambda (corner)
+                                  (player? (board-ref board corner)))
+                                (corners)))
+               (opposite-corners
+                (map opposite-corner corners)))
+          (length
+           (filter (lambda (opposite-corner)
+                     (and ((complement empty?) board opposite-corner)
+                          ((complement player?) board opposite-corner)))
+                   opposite-corners))))
       
       (define (center player? board)
         (if (player? (board-ref board (center-space board))) 1 0))
@@ -1786,27 +1848,56 @@
       
       (define (delta V-hat new-V-hat)
         (apply + (map (compose abs -)
-                  (map car V-hat)
-                  (map car new-V-hat))))
+                      (map car V-hat)
+                      (map car new-V-hat))))
       
       (let iter
-          ((V-hat `((1 . ,constant)
+          ((V-hat `(
+                    (1 . ,constant) ;
                     (1 . ,(cut wins X? <>))
                     (1 . ,(cut wins O? <>))
-                    (1 . ,(cut pairs X? <>))
-                    (1 . ,(cut pairs O? <>))
+                    ;; (1 . ,(cut pairs X? <>)) ;
+                    ;; (1 . ,(cut pairs O? <>)) ;
                     (1 . ,(cut center X? <>))
-                    (1 . ,(cut center O? <>)))))
-        (let-values
-            (((history outcome)
-              (perform V-hat
-                       (make-heuristic-O-player)
-                       ;; (make-random-player)
-                       (make-empty-board))))
-          (let* ((V-train (critique history outcome))
-                 (new-V-hat (generalize V-train V-hat)))
-            (debug (delta V-hat new-V-hat) outcome)
-            (iter new-V-hat))))
+                    (1 . ,(cut center O? <>))
+                    ;; (1 . ,(cut transient-forks X? X <>)) ;
+                    ;; (1 . ,(cut transient-forks O? O <>)) ;
+                    (1 . ,(cut forks X? <>))
+                    (1 . ,(cut forks O? <>))
+                    ;; (1 . ,(cut occupied-corners X? <>)) ;
+                    ;; (1 . ,(cut occupied-corners O? <>)) ;
+                    ;; (1 . ,(cut occupied-opposite-corners X? <>)) ;
+                    ;; (1 . ,(cut occupied-opposite-corners O? <>)) ;
+                    (1 . ,(cut occupied-sides X? <>))
+                    (1 . ,(cut occupied-sides O? <>))
+                    ))
+           (i 0)
+           (wins 0)
+           (losses 0)
+           (draws 0))
+        (if (< i 1000)
+            (let-values
+                (((history outcome)
+                  (perform V-hat
+                           (make-heuristic-O-player)
+                           ;; (make-random-player)
+                           (make-empty-board))))
+              (let* ((V-train (critique history outcome))
+                     (new-V-hat (generalize V-train V-hat)))
+                ;; (display-board (car history))      
+                ;; (debug (delta V-hat new-V-hat)
+                ;;        outcome
+                ;;        (occupied-corners X? (car history))
+                ;;        new-V-hat)
+                (debug (delta V-hat new-V-hat)
+                       outcome)
+                (iter
+                 new-V-hat
+                 (+ i 1)
+                 (+ wins (if (X-win? outcome) 1 0))
+                 (+ losses (if (O-win? outcome) 1 0))
+                 (+ draws (if (draw? outcome) 1 0)))))
+            (debug wins losses draws)))
       
     #+END_SRC
 
@@ -1863,3 +1954,40 @@
     relevant; it will be interesting to see if ephemeral features
     (like forks which, as opposed to convergent pairs, don't
     necessarily exist at game end) behave.
+
+    #+BEGIN_SRC scheme :tangle fold-binarily.scm :shebang #!/usr/bin/env chicken-scheme
+      (use srfi-1
+           debug
+           test)
+      
+      (define map-pairs
+        (case-lambda
+         ((transform transformanda)
+          (map-pairs transform '() transformanda))
+         ((transform transformata transformanda)
+          (if (null? transformanda)
+              transformata
+              (append
+               (map-pairs
+                transform
+                (let ((transformans (car transformanda)))
+                  (map (lambda (transformandum)
+                         (transform transformans transformandum))
+                       (cdr transformanda)))
+                (cdr transformanda))
+               transformata)))))
+      
+      (test "map-pairs"
+            '((4 . 5)
+              (3 . 4)
+              (3 . 5)
+              (2 . 3)
+              (2 . 4)
+              (2 . 5)
+              (1 . 2)
+              (1 . 3)
+              (1 . 4)
+              (1 . 5))
+            (map-pairs cons '(1 2 3 4 5)))
+      
+    #+END_SRC
