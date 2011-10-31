@@ -799,7 +799,7 @@
       
       ;;;; Player mechanics
       
-      (define (make-random-player player? player opponent? opponent)
+      (define (make-random-player)
         (lambda (board)
           (random-empty-space board)))
       
@@ -1778,31 +1778,35 @@
                          (error (- training-score estimated-score)))
                     (iter (cdr V-trains)
                           (map (lambda (hypothesis-feature)
-                                 (debug ((feature hypothesis-feature) state))
+                                 ;; (debug ((feature hypothesis-feature) state))
                                  (cons (+ (hypothesis hypothesis-feature)
                                           (* (eta) error ((feature hypothesis-feature) state)))
                                        (feature hypothesis-feature)))
                                V-hat))))))))
       
-      (let ((V-hat `((1 . ,constant)
-                     (1 . ,(cut wins X? <>))
-                     (1 . ,(cut wins O? <>))
-                     (1 . ,(cut pairs X? <>))
-                     (1 . ,(cut pairs O? <>))
-                     (1 . ,(cut center X? <>))
-                     (1 . ,(cut center O? <>)))))
+      (define (delta V-hat new-V-hat)
+        (apply + (map (compose abs -)
+                  (map car V-hat)
+                  (map car new-V-hat))))
+      
+      (let iter
+          ((V-hat `((1 . ,constant)
+                    (1 . ,(cut wins X? <>))
+                    (1 . ,(cut wins O? <>))
+                    (1 . ,(cut pairs X? <>))
+                    (1 . ,(cut pairs O? <>))
+                    (1 . ,(cut center X? <>))
+                    (1 . ,(cut center O? <>)))))
         (let-values
             (((history outcome)
               (perform V-hat
                        (make-heuristic-O-player)
+                       ;; (make-random-player)
                        (make-empty-board))))
-          (let ((V-train (critique history outcome)))
-            (debug (generalize V-train V-hat)))
-          (display-board (car history))
-          ;; (debug history
-          ;;        outcome
-          ;;        (critique history outcome))
-          ))
+          (let* ((V-train (critique history outcome))
+                 (new-V-hat (generalize V-train V-hat)))
+            (debug (delta V-hat new-V-hat) outcome)
+            (iter new-V-hat))))
       
     #+END_SRC
 
